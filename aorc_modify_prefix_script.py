@@ -19,8 +19,8 @@ from datetime import datetime
 #Version: 0.1.0
 
 
-debug = True
-if debug: dry_run = True
+debug = False
+dry_run = True
 
 
 log_file_path = (f"/export/home/rblackwe/scripts/original_aorc/logs/__log__{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt")
@@ -29,6 +29,7 @@ lock_file_path = ('/export/home/rblackwe/scripts/original_aorc/logs/__lock_file_
 user_file_path = ('/export/home/rblackwe/scripts/original_aorc/logs/__user_file__')
 alu_cmds_file_path = ('./__cmds_file_alu__.log')
 jnpr_cmds_file_path = ('./__cmds_file_jnpr__.log')
+
 
 lumen_banner = """
 ****************************************************************************************
@@ -55,6 +56,7 @@ lumen_banner = """
 ****************************************************************************************
 """
 
+
 banner_2 = """
 ----------------------------------------------------------------------------------------
 
@@ -67,7 +69,9 @@ https://nsmomavp045b.corp.intranet:8443/display/SOPP/AORC+Only+Modify+Prefix-lis
 ----------------------------------------------------------------------------------------
 """
 
+
 horiz_line = "-----------------------------------------------------------------------------------------"
+
 
 # One Nokia and one Juniper spare device that ROCI works with. These devices do not particpate with the local scrubbers.
 test_devices = [
@@ -77,7 +81,7 @@ test_devices = [
 
 
 # Complplete list of production PE routers that participate with the local scrubbers. 
-devices = [
+prod_devices = [
     {'manufacturer': 'Juniper', 'dns': 'edge9.sjo1'},
     {'manufacturer': 'Juniper', 'dns': 'edge3.chi10'},
     {'manufacturer': 'Juniper', 'dns': 'edge3.syd1'},
@@ -161,7 +165,7 @@ def user_choice(menu):
         return choice
 
 
-def get_customer_prefix_list():
+def get_customer_prefix_list(devices):
     while True:
         # Prompt user to enter a unique identifier for the customer they want to work on
         cust_id = input("Please enter the customer name, BusOrg, BAN, MVL: ")
@@ -346,6 +350,7 @@ def generate_commands(valid_prefixes,selected_policy,add_prefixes,remove_prefixe
     print(f"\033[93mThis is your last chance to abort before the commands are pushed to the devices.\033[0m")
     print("Please review the commands above before proceeding.")
     if debug: print("\nDEBUG: Reminder that You are in debug mode.")
+    if dry_run: print("\nDRYRUN: Reminder that You are in dryrun mode.")
     confirmation = input("\nAre the commands correct? (Y/N): ")
     if confirmation.lower() != 'y' and confirmation.lower() != 'yes':
         redprint("User has not confirmed the commands. Restarting program...")
@@ -396,7 +401,10 @@ def roci_push_commands(device, alu_cmds_file, jnpr_cmds_file):
         # Juniper devices
         elif device['manufacturer'] == "Juniper":
             roci_cmd = f"roci {device['dns']} -hidecmd -f={jnpr_cmds_file}"
-        roci_results = roci(roci_cmd)
+        if not dry_run:
+            roci_results = roci(roci_cmd)
+        else:
+            roci_results = ["Dry run: Command not executed."]
         for result in roci_results:
             output.append(result)
     except Exception as e:
@@ -426,6 +434,10 @@ def send_to_devices(purpose, devices, alu_cmds_file, jnpr_cmds_file):
 def main():
     # Register the cleanup function to be called on program exit
     atexit.register(cleanup_files)
+    if debug: 
+        devices = test_devices
+    else: 
+        devices = prod_devices
 
     print(lumen_banner)
     print(f"\033[1m{banner_2}\033[0m")
@@ -433,7 +445,7 @@ def main():
         user_decisions = {} # Dictionary to store the choices made by the user
 
         # Prompt user for customer information
-        selected_policy, cust_id = get_customer_prefix_list()
+        selected_policy, cust_id = get_customer_prefix_list(prod_devices)
         greenprint(f"\nYou have selected: {selected_policy}")
         user_decisions["Provided Cust ID"] = cust_id
         user_decisions["Selected policy"] = selected_policy
@@ -472,7 +484,6 @@ def main():
         with open(jnpr_cmds_file_path, 'w+') as file:
             for line in cmds_jnpr:
                 file.write(line + "\n")
-        if debug: devices = test_devices
         if config_confirm: 
             output = send_to_devices(roci_push_commands, devices, alu_cmds_file_path, jnpr_cmds_file_path)
         # print(output)
@@ -519,8 +530,3 @@ if __name__ == "__main__":
     main()
 
 # END OF SCRIPT
-
-
-
-
-
