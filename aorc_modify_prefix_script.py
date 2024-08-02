@@ -3,6 +3,7 @@
 import ipaddress
 import subprocess
 import os
+import grp
 import sys
 import multiprocessing
 import datetime
@@ -18,16 +19,22 @@ from typing import List, Dict, Tuple, Optional, TextIO
 #Version: 0.1.0
 
 
-debug = False # debug doesn't really do anything since I use vscode
+test_mode = False # 
 dry_run = True # dry_run will remain True until the script is ready for production
 
-script_path = "/export/home/rblackwe/scripts/aorc_modify_prefix_script/"
+group_name = "ddosops"
 tstamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+script_path = "/export/home/rblackwe/scripts/aorc_modify_prefix_script/"
+
+# Log file path
 log_file_path = (f"{script_path}/logs/__log__{tstamp}.txt")
-if dry_run: log_file_path = (f"{script_path}/logs/debug/__dryrun_log__{tstamp}.txt")
-if debug: log_file_path = (f"{script_path}/logs/debug/__debug_log__{tstamp}.txt")
+if dry_run or test_mode: log_file_path = (f"{script_path}/test_logs/__test_log__{tstamp}.txt")
+
+# Lock file paths
 lock_file_path = (f'{script_path}/lock/__lock_file__')
-user_file_path = (f'{script_path}/lock/__user_file__')
+pid_file_path = (f'{script_path}/lock/__pid_file__')
+
+# Configuration files for Nokia and Juniper devices
 alu_cmds_file_path = ('./__cmds_file_alu__.log')
 jnpr_cmds_file_path = ('./__cmds_file_jnpr__.log')
 
@@ -117,6 +124,14 @@ def greenprint(text: str) -> None:
 
 def redprint(text: str) -> None:
     print("\033[91m" + text + "\033[0m")
+
+
+def is_member_of_group(group_name):
+    try:
+        group_id = grp.getgrnam(group_name).gr_gid
+        return group_id in os.getgroups()
+    except KeyError:
+        return False
 
 
 def user_choice(menu: dict) -> str:
@@ -319,7 +334,7 @@ def generate_commands(valid_prefixes: List[str], selected_policy: str, add_prefi
     print(f"\n{horiz_line}")
     print(f"\033[93mThis is your last chance to abort before the commands are pushed to the devices.\033[0m")
     print("Please review the commands above before proceeding.")
-    if debug: print("\033[1m\033[91m\nDEBUG: Reminder that You are in debug mode.\033[0m")
+    if test_mode: print("\033[1m\033[91m\nTEST MODE: Reminder that You are in test mode.\033[0m")
     if dry_run: print("\033[1m\033[91m\nDRYRUN: Reminder that You are in dryrun mode.\033[0m")
     confirmation = input("\nAre the commands correct? (Y/N): ")
     if confirmation.lower() != 'y' and confirmation.lower() != 'yes':
@@ -373,7 +388,7 @@ def push_changes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str
         if not dry_run:
             roci_results = roci(roci_cmd)
         else:
-            roci_results = [f"Dry run: Command not executed on {device}"]
+            roci_results = [f"DRYRUN: Command not executed on {device}"]
         for result in roci_results:
             output.append(result)
     except Exception as e:
@@ -402,8 +417,8 @@ def parse_decisions(user_decisions: Dict[str, List[str]]) -> List[str]:
     log.append(horiz_line)
     log.append("SCRIPT LOG")
     log.append(horiz_line)
-    if debug: log.append("DEBUG MODE")
-    if dry_run: log.append("DRY RUN MODE")
+    if test_mode: log.append("TEST MODE")
+    if dry_run: log.append("DRYRUN MODE")
     for key, value in user_decisions.items():
         if isinstance(value, list) and len(value) > 1:
             log.append(f"{key}:")
@@ -419,18 +434,28 @@ def parse_decisions(user_decisions: Dict[str, List[str]]) -> List[str]:
 
 #  BEGINNING OF SCRIPT
 def main() -> None:
+
+    # Check if the user is a member of the group "ddos_ops"
+    username = os.getlogin()
+    if not is_member_of_group(group_name):
+        print(f"You do not have sufficient permission to run this program. User '{username}' must be a member of the '{group_name}' group.")
+        sys.exit(1)
+
     # Register the cleanup function to be called on program exit
     atexit.register(cleanup_files)
-    if debug: 
+
+    # Set the devices to be used based on the test_mode flag
+    if test_mode: 
         devices: List[str] = test_devices
     else: 
         devices: List[str] = prod_devices
     
     # Initialize dictionary to log choices made by the user
     user_decisions: Dict[str, str] = {} 
-    user_decisions["Username"] = os.getlogin()
+    user_decisions["Username"] = username
     user_decisions["Timestamp"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+    # Print the banner
     print(lumen_banner)
     print(f"\033[1m{script_banner}\033[0m")
 
