@@ -1,0 +1,27 @@
+----------------------------------------------------------------------------------------
+SCRIPT LOG
+----------------------------------------------------------------------------------------
+DRYRUN MODE
+Username: rblackwe
+Timestamp: 2024-08-02 20:09:27
+Provided Cust ID: ban
+Selected policy: aorc-1-3OTLJ5-BANKOFAMERICANA
+Action: Remove prefixes
+Provided Prefixes: ['1.1.1.1/32']
+Prefix confirmation: y
+Nokia Configuration:
+    /configure router policy-options abort
+    /configure router policy-options begin
+    /configure router policy-options prefix-list aorc-1-3OTLJ5-BANKOFAMERICANA no prefix 1.1.1.1/32 longer
+    /configure router policy-options commit
+    admin save
+
+Juniper Configuration:
+    edit private
+    delete policy-options policy-statement aorc-1-3OTLJ5-BANKOFAMERICANA term BGP from route-filter 1.1.1.1/32 orlonger
+    commit and-quit
+
+Configuration confirmation: y
+----------------------------------------------------------------------------------------
+Configuration changes have been pushed to the devices successfully!
+----------------------------------------------------------------------------------------
