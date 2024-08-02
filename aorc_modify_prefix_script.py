@@ -10,7 +10,7 @@ import atexit
 import time
 from subprocess import Popen, PIPE
 from datetime import datetime
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional, TextIO
 
 
 #Author: Richard Blackwell
@@ -18,14 +18,16 @@ from typing import List, Dict, Tuple
 #Version: 0.1.0
 
 
-debug = False
-dry_run = True
+debug = False # debug doesn't really do anything since I use vscode
+dry_run = True # dry_run will remain True until the script is ready for production
 
-
-log_file_path = (f"/export/home/rblackwe/scripts/aorc_modify_prefix_script/logs/__log__{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt")
-if debug: log_file_path = (f"/export/home/rblackwe/scripts/aorc_modify_prefix_script/logs/debug/__debug_log__{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt")
-lock_file_path = ('/export/home/rblackwe/scripts/aorc_modify_prefix_script/logs/__lock_file__')
-user_file_path = ('/export/home/rblackwe/scripts/aorc_modify_prefix_script/logs/__user_file__')
+script_path = "/export/home/rblackwe/scripts/aorc_modify_prefix_script/"
+tstamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+log_file_path = (f"{script_path}/logs/__log__{tstamp}.txt")
+if dry_run: log_file_path = (f"{script_path}/logs/debug/__dryrun_log__{tstamp}.txt")
+if debug: log_file_path = (f"{script_path}/logs/debug/__debug_log__{tstamp}.txt")
+lock_file_path = (f'{script_path}/lock/__lock_file__')
+user_file_path = (f'{script_path}/lock/__user_file__')
 alu_cmds_file_path = ('./__cmds_file_alu__.log')
 jnpr_cmds_file_path = ('./__cmds_file_jnpr__.log')
 
@@ -55,21 +57,16 @@ lumen_banner = """
 ****************************************************************************************
 """
 
+horiz_line = "----------------------------------------------------------------------------------------"
 
-banner_2 = """
-----------------------------------------------------------------------------------------
-
-                   The purpose of this script is to allow the DDoS SOC                  
-           to add and remove prefixes from exisiting AORC customer's policies           
-
-                          additional info can be found here:                           
-https://nsmomavp045b.corp.intranet:8443/display/SOPP/AORC+Only+Modify+Prefix-list+Script        
-
-----------------------------------------------------------------------------------------
-"""
-
-
-horiz_line = "-----------------------------------------------------------------------------------------"
+script_banner = (
+    f"{horiz_line}\n"
+    "                   The purpose of this script is to allow the DDoS SOC                  \n"
+    "           to add and remove prefixes from existing AORC customer's policies            \n\n"
+    "                           additional info can be found here:                           \n"
+    "https://nsmomavp045b.corp.intranet:8443/display/SOPP/AORC+Only+Modify+Prefix-list+Script\n"       
+    f"{horiz_line}\n"
+)
 
 
 # One Nokia and one Juniper spare device that ROCI works with. These devices do not particpate with the local scrubbers.
@@ -153,7 +150,7 @@ def get_customer_prefix_list(devices: List[Dict[str, str]]) -> Tuple[str, str]:
             file.write(jnpr_cmd)
 
         # Search for the customer's prefix list in the devices
-        found_prefix_list: List[str] = send_to_devices(roci_get_prefixes, devices, alu_cmds_file_path, jnpr_cmds_file_path)
+        found_prefix_list: List[str] = send_to_devices(search_config, devices, alu_cmds_file_path, jnpr_cmds_file_path)
         print(f"Search complete for customer \'{cust_id}\'.\n")
         if not found_prefix_list:
             print("No matches found. Please provide a different customer identifier.")
@@ -338,7 +335,7 @@ def roci(roci_cmd: str) -> List[str]:
     return results
 
 
-def roci_get_prefixes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
+def search_config(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
     found_prefix_list = []
     try:
         print(f"Searching {device['dns']}...")
@@ -363,7 +360,7 @@ def roci_get_prefixes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file
     return found_prefix_list
 
 
-def roci_push_commands(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
+def push_changes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
     output = []
     try:
         print(f"Pushing commands to {device['dns']}...")
@@ -376,7 +373,7 @@ def roci_push_commands(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_fil
         if not dry_run:
             roci_results = roci(roci_cmd)
         else:
-            roci_results = ["Dry run: Command not executed."]
+            roci_results = [f"Dry run: Command not executed on {device}"]
         for result in roci_results:
             output.append(result)
     except Exception as e:
@@ -400,14 +397,27 @@ def send_to_devices(purpose: callable, devices: List[Dict[str, str]], alu_cmds_f
     return output
 
 
-###
-#  BEGINNING OF SCRIPT
-###
-import atexit
-import os
-from datetime import datetime
-from typing import Dict, List, Tuple
+def parse_decisions(user_decisions: Dict[str, List[str]]) -> List[str]:
+    log = []
+    log.append(horiz_line)
+    log.append("SCRIPT LOG")
+    log.append(horiz_line)
+    if debug: log.append("DEBUG MODE")
+    if dry_run: log.append("DRY RUN MODE")
+    for key, value in user_decisions.items():
+        if isinstance(value, list) and len(value) > 1:
+            log.append(f"{key}:")
+            for item in value:
+                log.append(f"    {item}")
+        else:
+            log.append(f"{key}: {value}")
+    log.append(horiz_line)
+    log.append("Configuration changes have been pushed to the devices successfully!")
+    log.append(horiz_line)
+    return log
 
+
+#  BEGINNING OF SCRIPT
 def main() -> None:
     # Register the cleanup function to be called on program exit
     atexit.register(cleanup_files)
@@ -416,24 +426,24 @@ def main() -> None:
     else: 
         devices: List[str] = prod_devices
     
-    # Get the current user's username
-    username: str = os.getlogin()
-    # Get the current timestamp
-    timestamp: str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # Initialize dictionary to log choices made by the user
+    user_decisions: Dict[str, str] = {} 
+    user_decisions["Username"] = os.getlogin()
+    user_decisions["Timestamp"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
     print(lumen_banner)
-    print(f"\033[1m{banner_2}\033[0m")
+    print(f"\033[1m{script_banner}\033[0m")
+
     try:
-        user_decisions: Dict[str, str] = {} # Dictionary to store the choices made by the user
-        # Prompt user for customer information
+        # Get the customer's prefix list
         selected_policy: str
         cust_id: str
         selected_policy, cust_id = get_customer_prefix_list(prod_devices)
         greenprint(f"\nYou have selected: {selected_policy}")
-        user_decisions["Username"] = username
-        user_decisions["Timestamp"] = timestamp
         user_decisions["Provided Cust ID"] = cust_id
         user_decisions["Selected policy"] = selected_policy
-        # Prompt user to add or remove prefixes
+
+        # Add or remove prefixes
         menu_add_or_remove: Dict[str, str] = {  
             "1": "Add prefixes",
             "2": "Remove prefixes"}
@@ -446,6 +456,7 @@ def main() -> None:
             add_prefixes = False
             remove_prefixes = True
         user_decisions["Action"] = menu_add_or_remove[user_input]
+
         # Get the prefixes from the user
         valid_prefixes: List[str]
         prefix_confirm: str
@@ -454,17 +465,17 @@ def main() -> None:
         user_decisions["Provided Prefixes"] = valid_prefixes
         user_decisions["Prefix confirmation"] = prefix_confirm
         
-        # Begin building configuration files for Nokia and Juniper devices
+        # Generate configuration files
         cmds_alu: List[str]
         cmds_jnpr: List[str]
         config_confirm: str
         cmds_alu, cmds_jnpr, config_confirm = generate_commands(valid_prefixes, selected_policy, add_prefixes, remove_prefixes)
-        
         greenprint("\nUser has confirmed the commands. Proceeding with pushing the commands to the devices...\n")
         user_decisions["Nokia Configuration"] = cmds_alu
         user_decisions["Juniper Configuration"] = cmds_jnpr
         user_decisions["Configuration confirmation"] = config_confirm
-        # Push the commands to the devices
+
+        # Write the commands to the configuration files
         with open(alu_cmds_file_path, 'w+') as file:
             for line in cmds_alu:
                 file.write(line + "\n")
@@ -472,38 +483,20 @@ def main() -> None:
             for line in cmds_jnpr:
                 file.write(line + "\n")
         if config_confirm: 
-            output = send_to_devices(roci_push_commands, devices, alu_cmds_file_path, jnpr_cmds_file_path)
-        # print(output)
-        # Print out the choices made by the user for accounting purposes
-        with open(log_file_path, 'a') as file:
-            file.write(f"\n\n{horiz_line}\n"
-                       f"------CHOICES MADE BY USER------:\n"
-                       f"{horiz_line}\n")
-            for key in user_decisions:
-                if len(user_decisions[key]) > 1 and isinstance(user_decisions[key], list):
-                    file.write(f"{key}:\n")
-                    for item in user_decisions[key]:
-                        file.write(f"    {item}\n")
-                else:
-                    file.write(f"{key}: {user_decisions[key]}\n")
-            file.write(f"\n{horiz_line}\n"
-                       f"Commands have been pushed to the devices successfully!\n"
-                       f"{horiz_line}\n")
-            
-        print(f"\033[93m\n{horiz_line}\n"
-            f"------CHOICES MADE BY USER------:\n"
-            f"{horiz_line}\n\033[0m")
-        for key in user_decisions:
-            if len(user_decisions[key]) > 1 and isinstance(user_decisions[key], list):
-                print(f"{key}:")
-                for item in user_decisions[key]:
-                    print(f"    {item}")
-            else:
-                print(f"{key}: {user_decisions[key]}")
         
-        greenprint(f"\n{horiz_line}\n"
-                f"Commands have been pushed to the devices successfully!\n"
-                f"{horiz_line}\n")  
+        # Push the commands to the devices
+            output = send_to_devices(push_changes, devices, alu_cmds_file_path, jnpr_cmds_file_path)
+        # if debug: print(output)
+
+        print("\n\n")
+
+        # Log the user's decisions
+        log = parse_decisions(user_decisions)
+        with open(log_file_path, 'a') as file:
+            for line in log: file.write(line + "\n")
+        for line in log: 
+            print(line)
+
         print("Exiting program...")
         sys.exit(0)
     except KeyboardInterrupt:

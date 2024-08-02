@@ -1,28 +1,27 @@
-
-
 -----------------------------------------------------------------------------------------
-------CHOICES MADE BY USER------:
-Timestamp: 2024-08-01 22:43:21.582312
+DECISIONS MADE BY USER
 -----------------------------------------------------------------------------------------
-Provided Cust ID: bank
-Selected policy: aorc-1-3OTLJ5-BANKOFAMERICANA
+DRY RUN MODE
+Username: rblackwe
+Timestamp: 2024-08-02 10:11:15
+Provided Cust ID: mvl
+Selected policy: aorc-3-XCVJS43TNT-MVL-266103
 Action: Remove prefixes
 Provided Prefixes: ['1.1.1.1/32']
 Prefix confirmation: y
 Nokia Configuration:
     /configure router policy-options abort
     /configure router policy-options begin
-    /configure router policy-options prefix-list aorc-1-3OTLJ5-BANKOFAMERICANA no prefix 1.1.1.1/32 longer
+    /configure router policy-options prefix-list aorc-3-XCVJS43TNT-MVL-266103 no prefix 1.1.1.1/32 longer
     /configure router policy-options commit
     admin save
 
 Juniper Configuration:
     edit private
-    delete policy-options policy-statement aorc-1-3OTLJ5-BANKOFAMERICANA term BGP from route-filter 1.1.1.1/32 orlonger
+    delete policy-options policy-statement aorc-3-XCVJS43TNT-MVL-266103 term BGP from route-filter 1.1.1.1/32 orlonger
     commit and-quit
 
 Configuration confirmation: y
-
 -----------------------------------------------------------------------------------------
-Commands have been pushed to the devices successfully!
+Configuration changes have been pushed to the devices successfully!
 -----------------------------------------------------------------------------------------
