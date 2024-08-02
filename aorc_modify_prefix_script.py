@@ -11,7 +11,7 @@ import atexit
 import time
 from subprocess import Popen, PIPE
 from datetime import datetime
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 
 
 #Author: Richard Blackwell
@@ -126,7 +126,7 @@ def redprint(text: str) -> None:
     print("\033[91m" + text + "\033[0m")
 
 
-def is_member_of_group(group_name):
+def is_member_of_group(group_name: str) -> bool:
     try:
         group_id = grp.getgrnam(group_name).gr_gid
         return group_id in os.getgroups()
@@ -210,11 +210,11 @@ def get_prefixes() -> Tuple[List[str], str]:
     prefixes: List[str] = []
     while True:
         prefix: str = input()
-        # If the user presses enter on an empty line, break the loop
-        if prefix == "":
+        if prefix == "": # If the user presses enter on an empty line, break the loop
             break
         prefixes.append(prefix)
-    # Validate the entered prefixes
+
+    # Validate the prefixes
     valid_prefixes: List[str] = []
     invalid_prefixes: List[str] = []
     valid_prefixes, invalid_prefixes = process_prefixes(prefixes)
@@ -223,6 +223,7 @@ def get_prefixes() -> Tuple[List[str], str]:
         redprint("The following prefixes are invalid and will be omitted.\n")
         for prefix in invalid_prefixes:
             redprint(prefix)
+
     # Confirm the valid prefixes with the user
     if valid_prefixes:
         print(f"\n{horiz_line}")
@@ -232,6 +233,8 @@ def get_prefixes() -> Tuple[List[str], str]:
         confirmation: str = input("\nAre the prefixes are correct? (Y/N): ")
         if confirmation.lower() != 'y' and confirmation.lower() != 'yes':
             return get_prefixes()
+    
+    # If no valid prefixes were entered, prompt the user to re-enter them
     else:
         print(f"\n{horiz_line}")
         redprint("No valid prefixes were entered. Please re-enter all valid prefixes below:\n")
@@ -321,21 +324,28 @@ def generate_commands(valid_prefixes: List[str], selected_policy: str, add_prefi
                 cmds_jnpr.append(f"delete policy-options policy-statement {v6_selected_policy} term BGP from route-filter {prefix} orlonger")
     cmds_jnpr.append("commit and-quit\n")
 
+    # Print generated commands for Nokia and Juniper devices
     print(f"\n{horiz_line}")
     print("Commands have been generated for Nokia and Juniper devices. Please review below:")
+    
+    # Print Nokia commands
     print("\nNokia commands:")
     for line in cmds_alu:
         print(line)
 
+    # Print Juniper commands
     print("\nJuniper commands:")
     for line in cmds_jnpr:
         print(line)
 
+    # Prompt user to review commands before proceeding
     print(f"\n{horiz_line}")
     print(f"\033[93mThis is your last chance to abort before the commands are pushed to the devices.\033[0m")
     print("Please review the commands above before proceeding.")
-    if test_mode: print("\033[1m\033[91m\nTEST MODE: Reminder that You are in test mode.\033[0m")
-    if dry_run: print("\033[1m\033[91m\nDRYRUN: Reminder that You are in dryrun mode.\033[0m")
+    if test_mode: 
+        print("\033[1m\033[91m\nTEST MODE: Reminder that You are in test mode.\033[0m")
+    if dry_run: 
+        print("\033[1m\033[91m\nDRYRUN: Reminder that You are in dryrun mode.\033[0m")
     confirmation = input("\nAre the commands correct? (Y/N): ")
     if confirmation.lower() != 'y' and confirmation.lower() != 'yes':
         redprint("User has not confirmed the commands. Restarting program...")
@@ -360,7 +370,7 @@ def search_config(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: st
             roci_results = roci(roci_cmd)
             for result in roci_results:
                 words = result.split("\"")
-                if len(words) > 2:
+                if len(words) > 2: # Nokia prefixes are stored in the 2nd column
                     found_prefix_list.append(words[1])
         # Juniper devices
         elif device['manufacturer'] == "Juniper":
@@ -368,7 +378,7 @@ def search_config(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: st
             roci_results = roci(roci_cmd)
             for result in roci_results:
                 words = result.split(" ")
-                if len(words) > 4:
+                if len(words) > 4: # Juniper prefixes are stored in the 5th column
                     found_prefix_list.append(words[5])
     except Exception as e:
         print(f"Error processing device {device['dns']}: {e}")
@@ -399,7 +409,6 @@ def push_changes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str
 def send_to_devices(purpose: callable, devices: List[Dict[str, str]], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
     try:
         with multiprocessing.Pool(processes=10) as pool:
-            # Use tqdm to display a progress bar
             results = pool.starmap(purpose, [(device, alu_cmds_file, jnpr_cmds_file) 
                 for device in devices
             ])
