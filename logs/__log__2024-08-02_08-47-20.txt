@@ -1,0 +1,57 @@
+
+
+-----------------------------------------------------------------------------------------
+------CHOICES MADE BY USER------:
+-----------------------------------------------------------------------------------------
+Username: rblackwe
+Timestamp: 2024-08-02 08:47:20
+Provided Cust ID: mvl
+Selected policy: aorc-3-A86854-MVL-037609
+Action: Remove prefixes
+Provided Prefixes:
+    128.170.155.0/24
+    1.1.1.0/30
+    2.2.2.2/32
+    137.237.1.0/24
+    3.3.0.0/16
+    137.237.1.10/32
+    137.237.3.0/24
+    2001:db8::/32
+    2001:db8:85a3::8a2e:370:7334/128
+    2001:db8:85a3::8a2e:370:7335/128
+Prefix confirmation: y
+Nokia Configuration:
+    /configure router policy-options abort
+    /configure router policy-options begin
+    /configure router policy-options prefix-list aorc-3-A86854-MVL-037609 no prefix 128.170.155.0/24 longer
+    /configure router policy-options prefix-list aorc-3-A86854-MVL-037609 no prefix 1.1.1.0/30 longer
+    /configure router policy-options prefix-list aorc-3-A86854-MVL-037609 no prefix 2.2.2.2/32 longer
+    /configure router policy-options prefix-list aorc-3-A86854-MVL-037609 no prefix 137.237.1.0/24 longer
+    /configure router policy-options prefix-list aorc-3-A86854-MVL-037609 no prefix 3.3.0.0/16 longer
+    /configure router policy-options prefix-list aorc-3-A86854-MVL-037609 no prefix 137.237.1.10/32 longer
+    /configure router policy-options prefix-list aorc-3-A86854-MVL-037609 no prefix 137.237.3.0/24 longer
+    /configure router policy-options prefix-list aorc-3-A86854-MVL-037609 no prefix 2001:db8::/32 longer
+    /configure router policy-options prefix-list aorc-3-A86854-MVL-037609 no prefix 2001:db8:85a3::8a2e:370:7334/128 longer
+    /configure router policy-options prefix-list aorc-3-A86854-MVL-037609 no prefix 2001:db8:85a3::8a2e:370:7335/128 longer
+    /configure router policy-options commit
+    admin save
+
+Juniper Configuration:
+    edit private
+    delete policy-options policy-statement aorc-3-A86854-MVL-037609 term BGP from route-filter 128.170.155.0/24 orlonger
+    delete policy-options policy-statement aorc-3-A86854-MVL-037609 term BGP from route-filter 1.1.1.0/30 orlonger
+    delete policy-options policy-statement aorc-3-A86854-MVL-037609 term BGP from route-filter 2.2.2.2/32 orlonger
+    delete policy-options policy-statement aorc-3-A86854-MVL-037609 term BGP from route-filter 137.237.1.0/24 orlonger
+    delete policy-options policy-statement aorc-3-A86854-MVL-037609 term BGP from route-filter 3.3.0.0/16 orlonger
+    delete policy-options policy-statement aorc-3-A86854-MVL-037609 term BGP from route-filter 137.237.1.10/32 orlonger
+    delete policy-options policy-statement aorc-3-A86854-MVL-037609 term BGP from route-filter 137.237.3.0/24 orlonger
+    delete policy-options policy-statement ipv6-aorc-3-A86854-MVL-037609 term BGP from route-filter 2001:db8::/32 orlonger
+    delete policy-options policy-statement ipv6-aorc-3-A86854-MVL-037609 term BGP from route-filter 2001:db8:85a3::8a2e:370:7334/128 orlonger
+    delete policy-options policy-statement ipv6-aorc-3-A86854-MVL-037609 term BGP from route-filter 2001:db8:85a3::8a2e:370:7335/128 orlonger
+    commit and-quit
+
+Configuration confirmation: y
+
+-----------------------------------------------------------------------------------------
+Commands have been pushed to the devices successfully!
+-----------------------------------------------------------------------------------------

@@ -5,13 +5,12 @@ import subprocess
 import os
 import sys
 import multiprocessing
-from subprocess import Popen, PIPE
 import datetime
 import atexit
-import os
-import fcntl
 import time
+from subprocess import Popen, PIPE
 from datetime import datetime
+from typing import List, Dict, Tuple
 
 
 #Author: Richard Blackwell
@@ -106,34 +105,8 @@ prod_devices = [
 ]
 
 
-def lock_and_write_user_info(lock_file_path, user_file_path):
-    try:
-        with open(lock_file_path, 'w') as lock_file:
-            try:
-                # Try to acquire the lock
-                fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                
-                # Get the current user's username
-                username = os.getlogin()
-                # Get the current timestamp
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                
-                # Write the username and timestamp to the user file
-                with open(user_file_path, 'a') as user_file:
-                    user_file.write(f'{username} {timestamp}\n')
-                
-                # Release the lock
-                # fcntl.flock(lock_file, fcntl.LOCK_UN)
-                return "Lock acquired and user info written successfully."
-            except IOError:
-                # If the lock is not acquired, read and return the contents of the user file
-                with open(user_file_path, 'r') as user_file:
-                    return user_file.read()
-    except Exception as e:
-        return f"An error occurred: {e}"
-
-
-def cleanup_files():
+# Function to cleanup temporary files upon program exit
+def cleanup_files() -> None:
     try:
         os.remove(alu_cmds_file_path)
         os.remove(jnpr_cmds_file_path)
@@ -141,15 +114,15 @@ def cleanup_files():
         print(f"Error deleting files: {e}")
 
 
-def greenprint(text):
+def greenprint(text: str) -> None:
     print("\033[92m" + text + "\033[0m")
 
 
-def redprint(text):
+def redprint(text: str) -> None:
     print("\033[91m" + text + "\033[0m")
 
 
-def user_choice(menu):
+def user_choice(menu: dict) -> str:
     print(f"\n{horiz_line}\n"
           "Please enter the number corresponding to the choice you wish to make: \n")
 
@@ -157,7 +130,7 @@ def user_choice(menu):
     for key, value in menu.items():
         print(f"{key}: {value}")
 
-    choice = input("\nPlease enter the number corresponding to the choice you wish to make: ")
+    choice: str = input("\nPlease enter the number corresponding to the choice you wish to make: ")
     if choice in menu:
         return choice
     else:
@@ -165,49 +138,49 @@ def user_choice(menu):
         return choice
 
 
-def get_customer_prefix_list(devices):
+def get_customer_prefix_list(devices: List[Dict[str, str]]) -> Tuple[str, str]:
     while True:
         # Prompt user to enter a unique identifier for the customer they want to work on
-        cust_id = input("Please enter the customer name, BusOrg, BAN, MVL: ")
+        cust_id: str = input("Please enter the customer name, BusOrg, BAN, MVL: ")
         greenprint(f"\nSearching for customer \'{cust_id}\'...\n")
 
         # Using roci to search for the AORC prefix list for this specific customer using the rancid files. There is an 8 hour delay to when these files are updated
-        alu_cmd = f"show router policy \"ddos2-dynamic-check\" | match prefix-list | match ignore-case {cust_id}"
+        alu_cmd: str = f"show router policy \"ddos2-dynamic-check\" | match prefix-list | match ignore-case {cust_id}"
         with open(alu_cmds_file_path, 'w+') as file:
             file.write(alu_cmd)
-        jnpr_cmd = f"show configuration policy-options | display set | match ddos2-dynamic-check | match \"from policy\" | match {cust_id}"
+        jnpr_cmd: str = f"show configuration policy-options | display set | match ddos2-dynamic-check | match \"from policy\" | match {cust_id}"
         with open(jnpr_cmds_file_path, 'w+') as file:
             file.write(jnpr_cmd)
 
         # Search for the customer's prefix list in the devices
-        found_prefix_list = send_to_devices(roci_get_prefixes, devices, alu_cmds_file_path, jnpr_cmds_file_path)
+        found_prefix_list: List[str] = send_to_devices(roci_get_prefixes, devices, alu_cmds_file_path, jnpr_cmds_file_path)
         print(f"Search complete for customer \'{cust_id}\'.\n")
         if not found_prefix_list:
             print("No matches found. Please provide a different customer identifier.")
             continue
 
-        # Remove duplicates from the list of found prefix lists
+        # Sort and Remove duplicates from the list of found prefix lists
         found_prefix_list = sorted(list(set(found_prefix_list)))
 
         # Create a dictionary with the found policies
-        found_prefix_list_dict = {str(i+1): match for i, match in enumerate(found_prefix_list)}
+        found_prefix_list_dict: Dict[str, str] = {str(i+1): match for i, match in enumerate(found_prefix_list)}
 
         # Display matching prefix lists and prompt user to select the correct one
         found_prefix_list_dict[str(len(found_prefix_list_dict) + 1)] = "New search"
-        user_input = user_choice(found_prefix_list_dict)
+        user_input: str = user_choice(found_prefix_list_dict)
         
         if user_input == str(len(found_prefix_list_dict)):
             print("Starting a new search...")
             continue
         elif user_input in found_prefix_list_dict:
-            selected_prefix = found_prefix_list_dict[user_input]
+            selected_prefix: str = found_prefix_list_dict[user_input]
             return selected_prefix, cust_id
         else:
             print("Starting a new search...")
             continue
 
 
-def get_prefixes():
+def get_prefixes() -> Tuple[List[str], str]:
     # Prompt user to enter prefixes
     print(f"\n{horiz_line}")
     print("\033[1mFollow instructions below to enter prefixes\033[0m")
@@ -222,16 +195,16 @@ def get_prefixes():
     print()
     print("\033[1mPress ENTER on an empty line when you are done entering prefixes\033[0m")
     print(f"{horiz_line}")
-    prefixes = []
+    prefixes: List[str] = []
     while True:
-        prefix = input()
+        prefix: str = input()
         # If the user presses enter on an empty line, break the loop
         if prefix == "":
             break
         prefixes.append(prefix)
     # Validate the entered prefixes
-    valid_prefixes = []
-    invalid_prefixes = []
+    valid_prefixes: List[str] = []
+    invalid_prefixes: List[str] = []
     valid_prefixes, invalid_prefixes = process_prefixes(prefixes)
     if invalid_prefixes:
         print(f"\n{horiz_line}")
@@ -244,7 +217,7 @@ def get_prefixes():
         greenprint("The following prefixes appear to be valid. Please confirm before proceeding:\n")
         for prefix in valid_prefixes:
             greenprint(prefix)
-        confirmation = input("\nAre the prefixes are correct? (Y/N): ")
+        confirmation: str = input("\nAre the prefixes are correct? (Y/N): ")
         if confirmation.lower() != 'y' and confirmation.lower() != 'yes':
             return get_prefixes()
     else:
@@ -255,7 +228,7 @@ def get_prefixes():
     return valid_prefixes, confirmation
 
 
-def process_prefixes(raw_list):
+def process_prefixes(raw_list: List[str]) -> Tuple[List[str], List[str]]:
     valid_ips = []
     invalid_ips = []
 
@@ -272,9 +245,9 @@ def process_prefixes(raw_list):
     return valid_ips, invalid_ips
 
 
-def separate_prefixes(valid_ips):
-    ipv4_prefixes = []
-    ipv6_prefixes = []
+def separate_prefixes(valid_ips: List[str]) -> Tuple[List[str], List[str]]:
+    ipv4_prefixes: List[str] = []
+    ipv6_prefixes: List[str] = []
 
     for prefix in valid_ips:
         ip_object = ipaddress.ip_network(prefix)
@@ -286,12 +259,12 @@ def separate_prefixes(valid_ips):
     return ipv4_prefixes, ipv6_prefixes
 
 
-def generate_commands(valid_prefixes,selected_policy,add_prefixes,remove_prefixes):
+def generate_commands(valid_prefixes: List[str], selected_policy: str, add_prefixes: bool, remove_prefixes: bool) -> Tuple[List[str], List[str], str]:
     # IMPORTANT: This function only generates modifications to the AORC prefix-lists. It does not modify the AORC policies
 
     # Nokia commands
     # IMPORTANT: Nokia stores v4 and v6 prefixes in the same prefix-list. Therefore they are added and removed the same way.
-    cmds_alu = []
+    cmds_alu: List[str] = []
     cmds_alu.append("/configure router policy-options abort")
     cmds_alu.append("/configure router policy-options begin")
     # Add prefixes
@@ -309,7 +282,7 @@ def generate_commands(valid_prefixes,selected_policy,add_prefixes,remove_prefixe
             
     # Juniper commands
     # IMPORTANT: Juniper stores v4 and v6 prefixes in different prefix-lists. Therefore they are added and removed differently.
-    cmds_jnpr = []
+    cmds_jnpr: List[str] = []
     v4_prefixes, v6_prefixes = separate_prefixes(valid_prefixes)
     v6_selected_policy = selected_policy[:1] + "ipv6-" + selected_policy[1:] # Add ipv6- to the policy name
     v6_selected_policy = "ipv6-" + selected_policy # Add ipv6- to the policy name
@@ -359,14 +332,13 @@ def generate_commands(valid_prefixes,selected_policy,add_prefixes,remove_prefixe
     return cmds_alu, cmds_jnpr, confirmation
 
 
-def roci(roci_cmd):
-    # roci_cmd = f"roci msr1.dal1 -hidecmd -f={cmd_file}"
+def roci(roci_cmd: str) -> List[str]:
     results = subprocess.run(roci_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     results = results.stdout.split("\n")
     return results
 
 
-def roci_get_prefixes(device, alu_cmds_file, jnpr_cmds_file):
+def roci_get_prefixes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
     found_prefix_list = []
     try:
         print(f"Searching {device['dns']}...")
@@ -391,7 +363,7 @@ def roci_get_prefixes(device, alu_cmds_file, jnpr_cmds_file):
     return found_prefix_list
 
 
-def roci_push_commands(device, alu_cmds_file, jnpr_cmds_file):
+def roci_push_commands(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
     output = []
     try:
         print(f"Pushing commands to {device['dns']}...")
@@ -412,7 +384,7 @@ def roci_push_commands(device, alu_cmds_file, jnpr_cmds_file):
     return output
 
 
-def send_to_devices(purpose, devices, alu_cmds_file, jnpr_cmds_file):
+def send_to_devices(purpose: callable, devices: List[Dict[str, str]], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
     try:
         with multiprocessing.Pool(processes=10) as pool:
             # Use tqdm to display a progress bar
@@ -431,59 +403,67 @@ def send_to_devices(purpose, devices, alu_cmds_file, jnpr_cmds_file):
 ###
 #  BEGINNING OF SCRIPT
 ###
-def main():
+import atexit
+import os
+from datetime import datetime
+from typing import Dict, List, Tuple
+
+def main() -> None:
     # Register the cleanup function to be called on program exit
     atexit.register(cleanup_files)
     if debug: 
-        devices = test_devices
+        devices: List[str] = test_devices
     else: 
-        devices = prod_devices
+        devices: List[str] = prod_devices
     
     # Get the current user's username
-    username = os.getlogin()
+    username: str = os.getlogin()
     # Get the current timestamp
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
+    timestamp: str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print(lumen_banner)
     print(f"\033[1m{banner_2}\033[0m")
     try:
-        user_decisions = {} # Dictionary to store the choices made by the user
-
+        user_decisions: Dict[str, str] = {} # Dictionary to store the choices made by the user
         # Prompt user for customer information
+        selected_policy: str
+        cust_id: str
         selected_policy, cust_id = get_customer_prefix_list(prod_devices)
         greenprint(f"\nYou have selected: {selected_policy}")
         user_decisions["Username"] = username
         user_decisions["Timestamp"] = timestamp
         user_decisions["Provided Cust ID"] = cust_id
         user_decisions["Selected policy"] = selected_policy
-
         # Prompt user to add or remove prefixes
-        menu_add_or_remove = {  
+        menu_add_or_remove: Dict[str, str] = {  
             "1": "Add prefixes",
             "2": "Remove prefixes"}
-        user_input = user_choice(menu_add_or_remove)
+        user_input: str = user_choice(menu_add_or_remove)
         greenprint(f"\nYou have selected: {menu_add_or_remove[user_input]}")
         if user_input == "1":
-            add_prefixes = True
-            remove_prefixes = False
+            add_prefixes: bool = True
+            remove_prefixes: bool = False
         elif user_input == "2":
             add_prefixes = False
             remove_prefixes = True
         user_decisions["Action"] = menu_add_or_remove[user_input]
-
         # Get the prefixes from the user
+        valid_prefixes: List[str]
+        prefix_confirm: str
         valid_prefixes, prefix_confirm = get_prefixes()
         greenprint("User has confirmed the prefixes. Proceeding with generating commands...")
         user_decisions["Provided Prefixes"] = valid_prefixes
         user_decisions["Prefix confirmation"] = prefix_confirm
         
         # Begin building configuration files for Nokia and Juniper devices
-        cmds_alu, cmds_jnpr, config_confirm = generate_commands(valid_prefixes,selected_policy,add_prefixes,remove_prefixes)
-        greenprint("User has confirmed the commands. Proceeding with pushing the commands to the devices...")
+        cmds_alu: List[str]
+        cmds_jnpr: List[str]
+        config_confirm: str
+        cmds_alu, cmds_jnpr, config_confirm = generate_commands(valid_prefixes, selected_policy, add_prefixes, remove_prefixes)
+        
+        greenprint("\nUser has confirmed the commands. Proceeding with pushing the commands to the devices...\n")
         user_decisions["Nokia Configuration"] = cmds_alu
         user_decisions["Juniper Configuration"] = cmds_jnpr
         user_decisions["Configuration confirmation"] = config_confirm
-
         # Push the commands to the devices
         with open(alu_cmds_file_path, 'w+') as file:
             for line in cmds_alu:
@@ -494,15 +474,13 @@ def main():
         if config_confirm: 
             output = send_to_devices(roci_push_commands, devices, alu_cmds_file_path, jnpr_cmds_file_path)
         # print(output)
-
         # Print out the choices made by the user for accounting purposes
         with open(log_file_path, 'a') as file:
             file.write(f"\n\n{horiz_line}\n"
                        f"------CHOICES MADE BY USER------:\n"
-                       f"Timestamp: {datetime.now()}\n"
                        f"{horiz_line}\n")
             for key in user_decisions:
-                if len(user_decisions[key]) > 1 and type(user_decisions[key]) == list:
+                if len(user_decisions[key]) > 1 and isinstance(user_decisions[key], list):
                     file.write(f"{key}:\n")
                     for item in user_decisions[key]:
                         file.write(f"    {item}\n")
@@ -516,7 +494,7 @@ def main():
             f"------CHOICES MADE BY USER------:\n"
             f"{horiz_line}\n\033[0m")
         for key in user_decisions:
-            if len(user_decisions[key]) > 1 and type(user_decisions[key]) == list:
+            if len(user_decisions[key]) > 1 and isinstance(user_decisions[key], list):
                 print(f"{key}:")
                 for item in user_decisions[key]:
                     print(f"    {item}")
@@ -528,7 +506,6 @@ def main():
                 f"{horiz_line}\n")  
         print("Exiting program...")
         sys.exit(0)
-
     except KeyboardInterrupt:
         print("\nProcess interrupted by user. Exiting program...")
         sys.exit(0)

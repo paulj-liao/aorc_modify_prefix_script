@@ -499,7 +499,6 @@ def main():
         with open(log_file_path, 'a') as file:
             file.write(f"\n\n{horiz_line}\n"
                        f"------CHOICES MADE BY USER------:\n"
-                       f"Timestamp: {datetime.now()}\n"
                        f"{horiz_line}\n")
             for key in user_decisions:
                 if len(user_decisions[key]) > 1 and type(user_decisions[key]) == list:
