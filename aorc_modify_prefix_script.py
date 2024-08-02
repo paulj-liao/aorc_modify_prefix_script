@@ -11,7 +11,7 @@ import atexit
 import time
 from subprocess import Popen, PIPE
 from datetime import datetime
-from typing import List, Dict, Tuple, Optional, TextIO
+from typing import List, Dict, Tuple
 
 
 #Author: Richard Blackwell
@@ -24,7 +24,7 @@ dry_run = True # dry_run will remain True until the script is ready for producti
 
 group_name = "ddosops"
 tstamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-script_path = "/export/home/rblackwe/scripts/aorc_modify_prefix_script/"
+script_path = "/export/home/rblackwe/scripts/aorc_modify_prefix_script"
 
 # Log file path
 log_file_path = (f"{script_path}/logs/__log__{tstamp}.txt")
