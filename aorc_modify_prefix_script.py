@@ -9,9 +9,12 @@ import multiprocessing
 import datetime
 import atexit
 import time
+import fcntl
 from subprocess import Popen, PIPE
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
+# import resource_lock
+import time
 
 
 #Author: Richard Blackwell
@@ -112,8 +115,10 @@ prod_devices = [
 # Function to cleanup temporary files upon program exit
 def cleanup_files() -> None:
     try:
-        os.remove(alu_cmds_file_path)
-        os.remove(jnpr_cmds_file_path)
+        if os.path.exists(alu_cmds_file_path):
+            os.remove(alu_cmds_file_path)
+        if os.path.exists(jnpr_cmds_file_path):
+            os.remove(jnpr_cmds_file_path)
     except OSError as e:
         print(f"Error deleting files: {e}")
 
@@ -160,9 +165,11 @@ def get_customer_prefix_list(devices: List[Dict[str, str]]) -> Tuple[str, str]:
         alu_cmd: str = f"show router policy \"ddos2-dynamic-check\" | match prefix-list | match ignore-case {cust_id}"
         with open(alu_cmds_file_path, 'w+') as file:
             file.write(alu_cmd)
+            file.close()
         jnpr_cmd: str = f"show configuration policy-options | display set | match ddos2-dynamic-check | match \"from policy\" | match {cust_id}"
         with open(jnpr_cmds_file_path, 'w+') as file:
             file.write(jnpr_cmd)
+            file.close()
 
         # Search for the customer's prefix list in the devices
         found_prefix_list: List[str] = send_to_devices(search_config, devices, alu_cmds_file_path, jnpr_cmds_file_path)
@@ -370,7 +377,7 @@ def search_config(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: st
             roci_results = roci(roci_cmd)
             for result in roci_results:
                 words = result.split("\"")
-                if len(words) > 2: # Nokia prefixes are stored in the 2nd column
+                if len(words) > 2: # Nokia prefix list names are stored in the 2nd column
                     found_prefix_list.append(words[1])
         # Juniper devices
         elif device['manufacturer'] == "Juniper":
@@ -378,7 +385,7 @@ def search_config(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: st
             roci_results = roci(roci_cmd)
             for result in roci_results:
                 words = result.split(" ")
-                if len(words) > 4: # Juniper prefixes are stored in the 5th column
+                if len(words) > 4: # Juniper prefix list are stored in the 5th column
                     found_prefix_list.append(words[5])
     except Exception as e:
         print(f"Error processing device {device['dns']}: {e}")
@@ -408,10 +415,9 @@ def push_changes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str
 
 def send_to_devices(purpose: callable, devices: List[Dict[str, str]], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
     try:
-        with multiprocessing.Pool(processes=10) as pool:
-            results = pool.starmap(purpose, [(device, alu_cmds_file, jnpr_cmds_file) 
-                for device in devices
-            ])
+        job_list = [(device, alu_cmds_file, jnpr_cmds_file) for device in devices]
+        with multiprocessing.Pool(processes=len(job_list)) as pool:
+            results = pool.starmap(purpose, job_list)
         
         # Flatten the list of lists
         output = [prefix for sublist in results for prefix in sublist]
@@ -441,34 +447,104 @@ def parse_decisions(user_decisions: Dict[str, List[str]]) -> List[str]:
     return log
 
 
-#  BEGINNING OF SCRIPT
-def main() -> None:
+def write_pid_lock():
+    with open(pid_file_path, 'w') as pid_lock_file:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        username = os.getlogin()
+        pid_lock_file.write(f"Timestamp: {timestamp}\n")
+        pid_lock_file.write(f"Username: {username}\n")
 
-    # Check if the user is a member of the group "ddos_ops"
-    username = os.getlogin()
-    if not is_member_of_group(group_name):
-        print(f"You do not have sufficient permission to run this program. User '{username}' must be a member of the '{group_name}' group.")
-        sys.exit(1)
 
-    # Register the cleanup function to be called on program exit
-    atexit.register(cleanup_files)
+def read_pid_lock():
+    with open(pid_file_path, 'r') as pid_lock_file:
+        contents = pid_lock_file.read()
+    return contents
 
-    # Set the devices to be used based on the test_mode flag
-    if test_mode: 
-        devices: List[str] = test_devices
-    else: 
-        devices: List[str] = prod_devices
-    
-    # Initialize dictionary to log choices made by the user
-    user_decisions: Dict[str, str] = {} 
-    user_decisions["Username"] = username
-    user_decisions["Timestamp"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    # Print the banner
-    print(lumen_banner)
-    print(f"\033[1m{script_banner}\033[0m")
+def get_time_lapsed(timestamp_str):
+    timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+    current_time = datetime.now()
+    time_lapsed = current_time - timestamp
+    return time_lapsed
+
+
+# Check if the resource is locked. If it is, wait for it to be released
+def lock_resource():
+    attempt_limit = 4 # Number of attempts to acquire lock
+    wait_time = 2 # Time to wait before retrying
 
     try:
+        with open(lock_file_path, 'w') as lock_file:
+            for attempt in range(attempt_limit):
+                try:
+                    fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    write_pid_lock()
+                    # Lock acquired successfully running script
+                    main()
+                    return
+                
+                except IOError:
+                    contents = read_pid_lock()
+                    info = {"Username": "unknown", "Timestamp": "unknown"}
+                    for line in contents.split('\n'):
+                        if line.startswith("Username:"):
+                            info["Username"] = line.split("Username: ")[1]
+                        elif line.startswith("Timestamp:"):
+                            info["Timestamp"] = line.split("Timestamp: ")[1]
+                    
+                    time_lapsed = get_time_lapsed(info["Timestamp"])
+                    print(f"\n{horiz_line}")
+                    print("\033[1m\033[91mOnly one instance of this script can be running at one time.\033[0m")
+                    print(f"Program is already running. User '{info['Username']}' has been running this program for '{time_lapsed}'\n")
+
+                    if attempt < attempt_limit - 1:
+                        retry = input("Do you want to try again? (Y/YES to retry): ").strip().upper()
+                        if retry not in ['Y', 'YES']:
+                            print("Exiting program...")
+                            sys.exit(1)
+                        print(f"Retrying in {wait_time} seconds...")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"Failed to acquire lock after {attempt_limit} attempts.")
+                        print("You have reached the maximum number of attempts. Exiting.")
+                        sys.exit(1)
+    except (FileNotFoundError, KeyboardInterrupt) as e:
+        if isinstance(e, FileNotFoundError):
+            print(f"Error: {lock_file_path} does not exist.")
+        elif isinstance(e, KeyboardInterrupt):
+            print("\nProcess interrupted by user. Exiting program...")
+        sys.exit(0)
+
+
+
+#  BEGINNING OF SCRIPT
+def main() -> None:
+    try: # Handle keyboard interrupt
+
+        # Check if the user is a member of the group "ddos_ops"
+        username = os.getlogin()
+        if not is_member_of_group(group_name):
+            print(f"You do not have sufficient permission to run this program. User '{username}' must be a member of the '{group_name}' group.")
+            sys.exit(1)
+
+        # Set the devices to be used based on the test_mode flag
+        if test_mode: 
+            devices: List[str] = test_devices
+        else: 
+            devices: List[str] = prod_devices
+        
+        # Print the banner
+        print(lumen_banner)
+        print(f"\033[1m{script_banner}\033[0m")
+
+        # Register the cleanup function to be called on program exit
+        atexit.register(cleanup_files)
+
+        # Initialize dictionary to log choices made by the user
+        user_decisions: Dict[str, str] = {} 
+        user_decisions["Username"] = username
+        user_decisions["Timestamp"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
         # Get the customer's prefix list
         selected_policy: str
         cust_id: str
@@ -513,14 +589,13 @@ def main() -> None:
         with open(alu_cmds_file_path, 'w+') as file:
             for line in cmds_alu:
                 file.write(line + "\n")
+                file.close()
         with open(jnpr_cmds_file_path, 'w+') as file:
             for line in cmds_jnpr:
                 file.write(line + "\n")
+                file.close()
         if config_confirm: 
-        
-        # Push the commands to the devices
-            output = send_to_devices(push_changes, devices, alu_cmds_file_path, jnpr_cmds_file_path)
-        # if debug: print(output)
+                output = send_to_devices(push_changes, devices, alu_cmds_file_path, jnpr_cmds_file_path)
 
         print("\n\n")
 
@@ -538,7 +613,7 @@ def main() -> None:
         sys.exit(0)
 
 if __name__ == "__main__":
-    main()
+    lock_resource()
 
 # END OF SCRIPT
 
