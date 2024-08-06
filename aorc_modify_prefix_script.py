@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 # import resource_lock
 import time
+import time
 
 
 #Author: Richard Blackwell
@@ -25,6 +26,8 @@ import time
 test_mode = False # 
 dry_run = True # dry_run will remain True until the script is ready for production
 
+
+
 group_name = "ddosops"
 tstamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 script_path = "/export/home/rblackwe/scripts/aorc_modify_prefix_script"
@@ -34,8 +37,8 @@ log_file_path = (f"{script_path}/logs/__log__{tstamp}.txt")
 if dry_run or test_mode: log_file_path = (f"{script_path}/test_logs/__test_log__{tstamp}.txt")
 
 # Lock file paths
-lock_file_path = (f'{script_path}/lock/__lock_file__')
-pid_file_path = (f'{script_path}/lock/__pid_file__')
+lock_file_path = (f'{script_path}/.__lock__/__lock_file__')
+pid_file_path = (f'{script_path}/.__lock__/__pid_file__')
 
 # Configuration files for Nokia and Juniper devices
 alu_cmds_file_path = ('./__cmds_file_alu__.log')
@@ -493,9 +496,9 @@ def lock_resource():
                             info["Timestamp"] = line.split("Timestamp: ")[1]
                     
                     time_lapsed = get_time_lapsed(info["Timestamp"])
-                    print(f"\n{horiz_line}")
-                    print("\033[1m\033[91mOnly one instance of this script can be running at one time.\033[0m")
-                    print(f"Program is already running. User '{info['Username']}' has been running this program for '{time_lapsed}'\n")
+                    print(f"\n\033[1m\033[91m{horiz_line}")
+                    print("This program is already in use. Only one instance of this script can be run at one time.")
+                    print(f"User '{info['Username']}' is already running this program. Time lapsed: '{str(time_lapsed)[:8]}'\n{horiz_line}\033[0m")
 
                     if attempt < attempt_limit - 1:
                         retry = input("Do you want to try again? (Y/YES to retry): ").strip().upper()
@@ -589,11 +592,11 @@ def main() -> None:
         with open(alu_cmds_file_path, 'w+') as file:
             for line in cmds_alu:
                 file.write(line + "\n")
-                file.close()
+            file.close()
         with open(jnpr_cmds_file_path, 'w+') as file:
             for line in cmds_jnpr:
                 file.write(line + "\n")
-                file.close()
+            file.close()
         if config_confirm: 
                 output = send_to_devices(push_changes, devices, alu_cmds_file_path, jnpr_cmds_file_path)
 

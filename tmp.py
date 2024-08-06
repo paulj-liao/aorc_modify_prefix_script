@@ -1,25 +1,16 @@
-import resource_lock
 import time
-import sys
+import datetime
 
 
+def get_time_lapsed(timestamp_str):
+    timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+    current_time = datetime.now()
+    time_lapsed = current_time - timestamp
+    return time_lapsed
 
-script_path = "/export/home/rblackwe/scripts/aorc_modify_prefix_script"
-# Lock file paths
-lock_file_path = (f'{script_path}/lock/__lock_file__')
-pid_file_path = (f'{script_path}/lock/__pid_file__')
+
+tstamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+time.sleep.wait(10.5)
+duration = get_time_lapsed(tstamp)
 
 
-
-lock = resource_lock.ResourceLock(lock_file_path, pid_file_path)
-token = lock.acquire()
-if token is not None:
-    # the lock is successfully acquired
-    # Push the commands to the devices
-    # output = send_to_devices(push_changes, devices, alu_cmds_file_path, jnpr_cmds_file_path)
-    time.sleep(30)
-    lock.release(token)
-else:
-    # failed to acquire lock - print an error message
-    print(f"Failed to acquire lock details are : {lock.error_msg}")
-    sys.exit(1)
