@@ -14,8 +14,7 @@ from subprocess import Popen, PIPE
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 from colorama import Fore, Back, Style
-import time
-import time
+import threading
 
 
 #Author: Richard Blackwell
@@ -23,9 +22,9 @@ import time
 #Version: 0.1.0
 
 
-test_mode = False # 
-dry_run = True # dry_run will remain True until the script is ready for production
-
+test_mode = True # test_mode will ensure that the script only runs on the test devices
+dry_run = True # dry_run will ensure that the script only generates the commands but does not push them to the devices
+total_time_limit = 10 # 10 minutes
 
 
 group_name = "ddosops"
@@ -33,8 +32,8 @@ tstamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 script_path = "/export/home/rblackwe/scripts/aorc_modify_prefix_script"
 
 # Log file path
-log_file_path = (f"{script_path}/logs/__log__{tstamp}.txt")
-if dry_run or test_mode: log_file_path = (f"{script_path}/test_logs/__test_log__{tstamp}.txt")
+log_file_path = (f"{script_path}/__logs__/__log__{tstamp}.txt")
+if dry_run or test_mode: log_file_path = (f"{script_path}/__logs__/__test_log__{tstamp}.txt")
 
 # Lock file paths
 lock_file_path = (f'{script_path}/.__lock__/__lock_file__')
@@ -91,25 +90,25 @@ test_devices = [
 
 # Complplete list of production PE routers that participate with the local scrubbers. 
 prod_devices = [
-    {'manufacturer': 'Juniper', 'dns': 'edge9.sjo1'},
-    {'manufacturer': 'Juniper', 'dns': 'edge3.chi10'},
-    {'manufacturer': 'Juniper', 'dns': 'edge3.syd1'},
-    {'manufacturer': 'Nokia',   'dns': 'ear3.ams1'},
-    {'manufacturer': 'Nokia',   'dns': 'msr2.frf1'},
-    {'manufacturer': 'Nokia',   'dns': 'msr3.frf1'},
-    {'manufacturer': 'Nokia',   'dns': 'msr11.hkg3'},
-    {'manufacturer': 'Nokia',   'dns': 'msr12.hkg3'},
-    {'manufacturer': 'Nokia',   'dns': 'msr2.lax1'},
-    {'manufacturer': 'Nokia',   'dns': 'msr3.lax1'},
-    {'manufacturer': 'Nokia',   'dns': 'ear4.lon2'},
-    {'manufacturer': 'Nokia',   'dns': 'msr1.nyc1'},
-    {'manufacturer': 'Nokia',   'dns': 'ear2.par1'},
-    {'manufacturer': 'Nokia',   'dns': 'msr11.sap1'},
-    {'manufacturer': 'Nokia',   'dns': 'msr12.sap1'},
-    {'manufacturer': 'Nokia',   'dns': 'msr11.sng3'},
-    {'manufacturer': 'Nokia',   'dns': 'msr12.sng3'},
-    {'manufacturer': 'Nokia',   'dns': 'msr11.tok4'},
-    {'manufacturer': 'Nokia',   'dns': 'msr2.wdc12'},
+    # {'manufacturer': 'Juniper', 'dns': 'edge9.sjo1'},
+    # {'manufacturer': 'Juniper', 'dns': 'edge3.chi10'},
+    # {'manufacturer': 'Juniper', 'dns': 'edge3.syd1'},
+    # {'manufacturer': 'Nokia',   'dns': 'ear3.ams1'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr2.frf1'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr3.frf1'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr11.hkg3'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr12.hkg3'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr2.lax1'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr3.lax1'},
+    # {'manufacturer': 'Nokia',   'dns': 'ear4.lon2'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr1.nyc1'},
+    # {'manufacturer': 'Nokia',   'dns': 'ear2.par1'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr11.sap1'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr12.sap1'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr11.sng3'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr12.sng3'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr11.tok4'},
+    # {'manufacturer': 'Nokia',   'dns': 'msr2.wdc12'},
     {'manufacturer': 'Nokia',   'dns': 'msr3.wdc12'},
     {'manufacturer': 'Nokia',   'dns': 'msr1.dal1'}
 ]
@@ -126,8 +125,15 @@ def cleanup_files() -> None:
         print(f"Error deleting files: {e}")
 
 
+def timeout():
+    print(f"\n{horiz_line}")
+    redprint(f"Time's up! This program has a time limit of {total_time_limit} seconds.")
+    print("Exiting program...")
+    os._exit(1)
+
+
 def selection_print(text: str) -> None:
-    print("\033[1m" + "\033[46m" + text + "\033[0m")
+    print("\033[1m" + text + "\033[0m")
 
 
 def redprint(text: str) -> None:
@@ -151,6 +157,7 @@ def user_choice(menu: dict) -> str:
         print(f"{key}: {value}")
 
     choice: str = input("\nPlease enter the number corresponding to the choice you wish to make: ")
+    choice = str(choice.strip())
     if choice in menu:
         return choice
     else:
@@ -207,14 +214,14 @@ def get_prefixes() -> Tuple[List[str], str]:
     # Prompt user to enter prefixes
     print(f"\n{horiz_line}")
     print("\033[1mFollow instructions below to enter prefixes\033[0m")
-    print("\033[3m   • Only one prefix per line. Please see example below:\033[0m")
+    print("   • Only one prefix per line. Please see example below:")
     print("         example: 1.1.0.0/16")
     print("                  1.1.1.1/32")
-    print("\033[93m   • Prefixes can be entered with or without CIDR notation\033[0m")
+    print("   • Prefixes can be entered with or without CIDR notation")
     print("         example: 1.1.1.1 will become 1.1.1.1/32")
-    print("\033[93m   • Single IPs entered with CIDR notation will be converted to network address\033[0m")
+    print("   • Single IPs entered with CIDR notation will be converted to network address")
     print("         example: 1.1.1.1/24 will become 1.1.1.0/24")
-    print("\033[93m   • IPv4 and IPv6 prefixes are accepted\033[0m")
+    print("   • IPv4 and IPv6 prefixes are accepted")
     print()
     print("\033[1mPress ENTER on an empty line when you are done entering prefixes\033[0m")
     print(f"{horiz_line}")
@@ -228,7 +235,7 @@ def get_prefixes() -> Tuple[List[str], str]:
     # Validate the prefixes
     valid_prefixes: List[str] = []
     invalid_prefixes: List[str] = []
-    valid_prefixes, invalid_prefixes = process_prefixes(prefixes)
+    valid_prefixes, invalid_prefixes = parse_prefixes(prefixes)
     if invalid_prefixes:
         print(f"\n{horiz_line}")
         redprint("The following prefixes are invalid and will be omitted.\n")
@@ -255,19 +262,21 @@ def get_prefixes() -> Tuple[List[str], str]:
     return valid_prefixes, confirmation
 
 
-def process_prefixes(raw_list: List[str]) -> Tuple[List[str], List[str]]:
+def parse_prefixes(raw_list: List[str]) -> Tuple[List[str], List[str]]:
     valid_ips = []
     invalid_ips = []
 
     for prefix in raw_list:
-        try:
-            # Convert the raw prefix into an IP network object
-            ip_object = ipaddress.ip_network(prefix, strict=False)
-            # Append the network address to the prefix_list
-            valid_ips.append(str(ip_object))
-        except ValueError:
-            # If the prefix is invalid, add it to the invalid_prefixes list
-            invalid_ips.append(prefix)
+        prefix = prefix.strip()
+        if len(prefix) > 0: 
+            try:
+                # Convert the raw prefix into an IP network object
+                ip_object = ipaddress.ip_network(prefix, strict=False)
+                # Append the network address to the prefix_list
+                valid_ips.append(str(ip_object))
+            except ValueError:
+                # If the prefix is invalid, add it to the invalid_prefixes list
+                invalid_ips.append(prefix)
     
     return valid_ips, invalid_ips
 
@@ -400,7 +409,7 @@ def search_config(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: st
 def push_changes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
     output = []
     try:
-        print(f"Pushing commands to {device['dns']}...")
+        # print(f"Pushing commands to {device['dns']}...")
         # Nokia devices
         if device['manufacturer'] == "Nokia":
             roci_cmd = f"roci {device['dns']} -hidecmd -f={alu_cmds_file}"
@@ -413,7 +422,7 @@ def push_changes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str
             roci_results = [f"DRYRUN: Command not executed on {device}"]
         for result in roci_results:
             output.append(result)
-        print(f"Commands have been pushed to {device['dns']} successfully!")
+        print(f"Commands have been pushed to {device['dns']}")
     except Exception as e:
         print(f"Error processing device {device['dns']}: {e}")
     return output
@@ -433,24 +442,19 @@ def send_to_devices(purpose: callable, devices: List[Dict[str, str]], alu_cmds_f
     return output
 
 
-def parse_decisions(user_decisions: Dict[str, List[str]]) -> List[str]:
-    log = []
-    log.append(horiz_line)
-    log.append("SCRIPT LOG")
-    log.append(horiz_line)
-    if test_mode: log.append("TEST MODE")
-    if dry_run: log.append("DRYRUN MODE")
-    for key, value in user_decisions.items():
-        if isinstance(value, list) and len(value) > 1:
-            log.append(f"{key}:")
-            for item in value:
-                log.append(f"    {item}")
-        else:
-            log.append(f"{key}: {value}")
-    log.append(horiz_line)
-    log.append("Configuration changes have been pushed to the devices successfully!")
-    log.append(horiz_line)
-    return log
+def add_to_log(log_dict: Dict[str, str], key: str, value: str) -> Dict[str, str]:
+        log_dict[key] = value
+        try:
+            with open(log_file_path, 'a') as file:
+                if key == "Nokia Configuration" or key == "Juniper Configuration":
+                    file.write(f"{key}:\n")
+                    for line in value:
+                        file.write(f"{line}\n")
+                else:
+                    file.write(f"{key}: {value}\n")
+                return log_dict
+        except Exception as e:
+            print(f"An error occurred while writing to log file: {e}")
 
 
 def write_pid_lock():
@@ -478,10 +482,13 @@ def get_time_lapsed(timestamp_str):
 def lock_resource():
     attempt_limit = 4 # Number of attempts to acquire lock
     wait_time = 2 # Time to wait before retrying
+    timer = threading.Timer(total_time_limit, timeout)
+    timer.start()   
 
     try:
         with open(lock_file_path, 'w') as lock_file:
             for attempt in range(attempt_limit):
+                # Attempt to acquire the lock
                 try:
                     fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     write_pid_lock()
@@ -489,6 +496,7 @@ def lock_resource():
                     main()
                     return
                 
+                # If the lock is already acquired, display the user who is running the script and the time lapsed
                 except IOError:
                     contents = read_pid_lock()
                     info = {"Username": "unknown", "Timestamp": "unknown"}
@@ -502,6 +510,7 @@ def lock_resource():
                     print(f"\n\033[1m\033[91m{horiz_line}")
                     print("This program is already in use. Only one instance of this script can be run at one time.")
                     print(f"User '{info['Username']}' is already running this program. Time lapsed: '{str(time_lapsed)[:8]}'\n{horiz_line}\033[0m")
+                    print("\033[0m")
 
                     if attempt < attempt_limit - 1:
                         retry = input("Do you want to try again? (Y/YES to retry): ").strip().upper()
@@ -514,6 +523,12 @@ def lock_resource():
                         print(f"Failed to acquire lock after {attempt_limit} attempts.")
                         print("You have reached the maximum number of attempts. Exiting.")
                         sys.exit(1)
+                
+                # Release the lock
+                finally:
+                    fcntl.flock(lock_file, fcntl.LOCK_UN)
+                    timer.cancel()
+
     except (FileNotFoundError, KeyboardInterrupt) as e:
         if isinstance(e, FileNotFoundError):
             print(f"Error: {lock_file_path} does not exist.")
@@ -534,8 +549,13 @@ def main() -> None:
             sys.exit(1)
 
         # Set the devices to be used based on the test_mode flag
+
         if test_mode: 
+            print("\033[1m\033[91m\nTEST MODE: Reminder that You are in test mode.\033[0m")
             devices: List[str] = test_devices
+        elif dry_run:
+            print("\033[1m\033[91m\nDRY RUN MODE: Reminder that You are in dry run mode.\033[0m")
+            devices: List[str] = prod_devices
         else: 
             devices: List[str] = prod_devices
         
@@ -547,17 +567,17 @@ def main() -> None:
         atexit.register(cleanup_files)
 
         # Initialize dictionary to log choices made by the user
-        user_decisions: Dict[str, str] = {} 
-        user_decisions["Username"] = username
-        user_decisions["Timestamp"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        user_decisions: Dict[str, str] = {}  
+        user_decisions = add_to_log(user_decisions, "Username", username)
+        user_decisions = add_to_log(user_decisions, "Timestamp", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
         # Get the customer's prefix list
         selected_policy: str
         cust_id: str
         selected_policy, cust_id = get_customer_prefix_list(prod_devices)
         selection_print(f"\nYou have selected: {selected_policy}")
-        user_decisions["Provided Cust ID"] = cust_id
-        user_decisions["Selected policy"] = selected_policy
+        user_decisions = add_to_log(user_decisions, "Provided Cust ID", cust_id)
+        user_decisions = add_to_log(user_decisions, "Selected policy", selected_policy)
 
         # Add or remove prefixes
         menu_add_or_remove: Dict[str, str] = {  
@@ -571,28 +591,28 @@ def main() -> None:
         elif user_input == "2":
             add_prefixes = False
             remove_prefixes = True
-        user_decisions["Action"] = menu_add_or_remove[user_input]
+        user_decisions = add_to_log(user_decisions, "Selected action", menu_add_or_remove[user_input])
 
         # Get the prefixes from the user
         valid_prefixes: List[str]
         prefix_confirm: str
         valid_prefixes, prefix_confirm = get_prefixes()
-        selection_print(f"\nUser has confirmed the prefixes. Proceeding with generating commands...")
-        print("")
-        user_decisions["Provided Prefixes"] = valid_prefixes
-        user_decisions["Prefix confirmation"] = prefix_confirm
+        selection_print(f"\nUser has confirmed the prefixes. Proceeding with generating commands...\033[0m")
+        print("\033[0m")
+        user_decisions = add_to_log(user_decisions, "Provided Prefixes", valid_prefixes)
+        user_decisions = add_to_log(user_decisions, "Prefix confirmation", prefix_confirm)
         
         # Generate configuration files
         cmds_alu: List[str]
         cmds_jnpr: List[str]
         config_confirm: str
         cmds_alu, cmds_jnpr, config_confirm = generate_commands(valid_prefixes, selected_policy, add_prefixes, remove_prefixes)
-        print("")
+        print("\033[0m")
         selection_print("User has confirmed the commands. Proceeding with pushing the commands to the devices...")
-        print("")
-        user_decisions["Nokia Configuration"] = cmds_alu
-        user_decisions["Juniper Configuration"] = cmds_jnpr
-        user_decisions["Configuration confirmation"] = config_confirm
+        print("\033[0m")
+        user_decisions = add_to_log(user_decisions, "Nokia Configuration", cmds_alu)
+        user_decisions = add_to_log(user_decisions, "Juniper Configuration", cmds_jnpr)
+        user_decisions = add_to_log(user_decisions, "Configuration confirmation", config_confirm)
 
         # Write the commands to the configuration files
         with open(alu_cmds_file_path, 'w+') as file:
@@ -605,23 +625,26 @@ def main() -> None:
             file.close()
         if config_confirm: 
                 output = send_to_devices(push_changes, devices, alu_cmds_file_path, jnpr_cmds_file_path)
+        print("\033[0m")
+        print(f"{horiz_line}")
+        selection_print("Configuration changes have been pushed to the devices successfully!")
+        print(f"{horiz_line}\n")
 
-        print("\n\n")
+        # Print the log of user's decisions
+        selection_print("Log of user's decisions:")
+        print("")
+        for key, value in user_decisions.items():
+            if key == "Nokia Configuration" or key == "Juniper Configuration":
+                print(f"{key}:")
+                for line in value:
+                    if len(line) > 1:
+                        print(line)
+            else: 
+                print(f"{key}: {value}")
 
-        # Log the user's decisions
-        log = parse_decisions(user_decisions)
-        try:
-            with open(log_file_path, 'a') as file:
-                for line in log: file.write(line + "\n")
-            for line in log: 
-                if "SCRIPT LOG" in line: selection_print(line)
-                else: print(line)
-        except FileNotFoundError as e:
-            print(f"Error: {log_file_path} does not exist.")
-        except IOError as e:
-            print(f"Error opening file: {e}")
-
-        print("Exiting program...")
+        
+        print(f"\n{horiz_line}")
+        selection_print("Program Finished. Exiting...")
         sys.exit(0)
     except KeyboardInterrupt:
         print("\nProcess interrupted by user. Exiting program...")

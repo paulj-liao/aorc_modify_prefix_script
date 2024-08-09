@@ -1,16 +1,18 @@
-import time
-import datetime
+import threading
 
+def get_user_name():
+    name = input("Please enter your name: ")
+    print(f"Hello, {name}!")
 
-def get_time_lapsed(timestamp_str):
-    timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-    current_time = datetime.now()
-    time_lapsed = current_time - timestamp
-    return time_lapsed
+def timeout():
+    print("\nTime's up! Exiting the program...")
+    exit(1)
 
+# Set a timer for 30 seconds
+timer = threading.Timer(30.0, timeout)
+timer.start()
 
-tstamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-time.sleep.wait(10.5)
-duration = get_time_lapsed(tstamp)
-
-
+try:
+    get_user_name()
+finally:
+    timer.cancel()  # Cancel the timer if the user enters their name in time

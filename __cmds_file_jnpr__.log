@@ -1,0 +1,1 @@
+show configuration policy-options | display set | match ddos2-dynamic-check | match "from policy" | match easy

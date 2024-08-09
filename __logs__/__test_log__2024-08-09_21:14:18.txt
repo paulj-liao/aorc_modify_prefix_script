@@ -1,0 +1,10 @@
+Username: rblackwe
+Timestamp: 2024-08-09 21:14:18
+Selected policy: aorc-5-N8BGCL7D-EASYNET
+Selected policy: aorc-5-N8BGCL7D-EASYNET
+Selected action: Remove prefixes
+Provided Prefixes: ['1.1.1.1/32']
+Prefix confirmation: y
+Nokia Configuration: ['/configure router policy-options abort', '/configure router policy-options begin', '/configure router policy-options prefix-list aorc-5-N8BGCL7D-EASYNET no prefix 1.1.1.1/32 longer', '/configure router policy-options commit', 'admin save\n']
+Juniper Configuration: ['edit private', 'delete policy-options policy-statement aorc-5-N8BGCL7D-EASYNET term BGP from route-filter 1.1.1.1/32 orlonger', 'commit and-quit\n']
+Configuration confirmation: y
