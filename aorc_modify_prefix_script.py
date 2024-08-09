@@ -16,6 +16,7 @@ from typing import List, Dict, Tuple, Optional
 from colorama import Fore, Back, Style
 import threading
 
+# TODO - Improve the parsing of erroneous user input
 
 #Author: Richard Blackwell
 #Date: 1 August 2024 
@@ -24,7 +25,7 @@ import threading
 
 test_mode = True # test_mode will ensure that the script only runs on the test devices
 dry_run = True # dry_run will ensure that the script only generates the commands but does not push them to the devices
-total_time_limit = 10 # 10 minutes
+total_time_limit = 600 # Total time limit for the script to run in seconds
 
 
 group_name = "ddosops"
@@ -108,7 +109,7 @@ prod_devices = [
     # {'manufacturer': 'Nokia',   'dns': 'msr11.sng3'},
     # {'manufacturer': 'Nokia',   'dns': 'msr12.sng3'},
     # {'manufacturer': 'Nokia',   'dns': 'msr11.tok4'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr2.wdc12'},
+    {'manufacturer': 'Nokia',   'dns': 'msr2.wdc12'},
     {'manufacturer': 'Nokia',   'dns': 'msr3.wdc12'},
     {'manufacturer': 'Nokia',   'dns': 'msr1.dal1'}
 ]
@@ -127,7 +128,7 @@ def cleanup_files() -> None:
 
 def timeout():
     print(f"\n{horiz_line}")
-    redprint(f"Time's up! This program has a time limit of {total_time_limit} seconds.")
+    redprint(f"Time's up! This program has a time limit of {total_time_limit/60:.2f} minutes.")
     print("Exiting program...")
     os._exit(1)
 
@@ -146,6 +147,25 @@ def is_member_of_group(group_name: str) -> bool:
         return group_id in os.getgroups()
     except KeyError:
         return False
+
+
+def action_choice(menu: Dict[str, str]) -> str:
+    while True:
+        print(f"\n{horiz_line}\n"
+              "What action would you like to perform? \n")
+
+        for key, value in menu.items():
+            print(f"{key}: {value}")
+
+        choice: str = input("\nPlease enter the number corresponding to the choice you wish to make: ")
+        choice = str(choice.strip())
+        if choice in menu:
+            break
+        else:
+            redprint("Invalid choice. Please try again.")
+            continue
+
+    return choice
 
 
 def user_choice(menu: dict) -> str:
@@ -267,7 +287,7 @@ def parse_prefixes(raw_list: List[str]) -> Tuple[List[str], List[str]]:
     invalid_ips = []
 
     for prefix in raw_list:
-        prefix = prefix.strip()
+        prefix = str(prefix.strip())
         if len(prefix) > 0: 
             try:
                 # Convert the raw prefix into an IP network object
@@ -580,18 +600,21 @@ def main() -> None:
         user_decisions = add_to_log(user_decisions, "Selected policy", selected_policy)
 
         # Add or remove prefixes
-        menu_add_or_remove: Dict[str, str] = {  
+        menu: Dict[str, str] = {  
             "1": "Add prefixes",
             "2": "Remove prefixes"}
-        user_input: str = user_choice(menu_add_or_remove)
-        selection_print(f"\nYou have selected: {menu_add_or_remove[user_input]}")
-        if user_input == "1":
+        action = action_choice(menu)
+        if action == "1":
+            selection_print(f"\nYou have selected: Add prefixes")
+            user_decisions = add_to_log(user_decisions, "Selected action", "Add prefixes")
             add_prefixes: bool = True
             remove_prefixes: bool = False
-        elif user_input == "2":
-            add_prefixes = False
-            remove_prefixes = True
-        user_decisions = add_to_log(user_decisions, "Selected action", menu_add_or_remove[user_input])
+        elif action == "2":
+            selection_print(f"\nYou have selected: Remove prefixes")
+            user_decisions = add_to_log(user_decisions, "Selected action", "Add prefixes")
+            add_prefixes: bool = False
+            remove_prefixes: bool = True
+        
 
         # Get the prefixes from the user
         valid_prefixes: List[str]

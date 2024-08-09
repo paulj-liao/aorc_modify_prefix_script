@@ -1,0 +1,4 @@
+Username: rblackwe
+Timestamp: 2024-08-09 22:41:08
+Provided Cust ID: easy
+Selected policy: aorc-5-N8BGCL7D-EASYNET
