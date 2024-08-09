@@ -13,7 +13,7 @@ import fcntl
 from subprocess import Popen, PIPE
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
-# import resource_lock
+from colorama import Fore, Back, Style
 import time
 import time
 
@@ -126,12 +126,12 @@ def cleanup_files() -> None:
         print(f"Error deleting files: {e}")
 
 
-def greenprint(text: str) -> None:
-    print("\033[92m" + text + "\033[0m")
+def selection_print(text: str) -> None:
+    print("\033[1m" + "\033[46m" + text + "\033[0m")
 
 
 def redprint(text: str) -> None:
-    print("\033[91m" + text + "\033[0m")
+    print("\033[1m" + "\033[91m" + text + "\033[0m")
 
 
 def is_member_of_group(group_name: str) -> bool:
@@ -162,7 +162,8 @@ def get_customer_prefix_list(devices: List[Dict[str, str]]) -> Tuple[str, str]:
     while True:
         # Prompt user to enter a unique identifier for the customer they want to work on
         cust_id: str = input("Please enter the customer name, BusOrg, BAN, MVL: ")
-        greenprint(f"\nSearching for customer \'{cust_id}\'...\n")
+        selection_print(f"\nSearching for customer \'{cust_id}\'...")
+        print("")
 
         # Using roci to search for the AORC prefix list for this specific customer using the rancid files. There is an 8 hour delay to when these files are updated
         alu_cmd: str = f"show router policy \"ddos2-dynamic-check\" | match prefix-list | match ignore-case {cust_id}"
@@ -206,11 +207,11 @@ def get_prefixes() -> Tuple[List[str], str]:
     # Prompt user to enter prefixes
     print(f"\n{horiz_line}")
     print("\033[1mFollow instructions below to enter prefixes\033[0m")
-    print("\033[93m   • Only one prefix per line. Please see example below:\033[0m")
+    print("\033[3m   • Only one prefix per line. Please see example below:\033[0m")
     print("         example: 1.1.0.0/16")
     print("                  1.1.1.1/32")
     print("\033[93m   • Prefixes can be entered with or without CIDR notation\033[0m")
-    print("         example: 1.1.1.1 will become 1.1.1.1/32m")
+    print("         example: 1.1.1.1 will become 1.1.1.1/32")
     print("\033[93m   • Single IPs entered with CIDR notation will be converted to network address\033[0m")
     print("         example: 1.1.1.1/24 will become 1.1.1.0/24")
     print("\033[93m   • IPv4 and IPv6 prefixes are accepted\033[0m")
@@ -237,9 +238,10 @@ def get_prefixes() -> Tuple[List[str], str]:
     # Confirm the valid prefixes with the user
     if valid_prefixes:
         print(f"\n{horiz_line}")
-        greenprint("The following prefixes appear to be valid. Please confirm before proceeding:\n")
+        selection_print("The following prefixes appear to be valid. Please confirm before proceeding:")
+        print("")
         for prefix in valid_prefixes:
-            greenprint(prefix)
+            print(prefix)
         confirmation: str = input("\nAre the prefixes are correct? (Y/N): ")
         if confirmation.lower() != 'y' and confirmation.lower() != 'yes':
             return get_prefixes()
@@ -411,6 +413,7 @@ def push_changes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str
             roci_results = [f"DRYRUN: Command not executed on {device}"]
         for result in roci_results:
             output.append(result)
+        print(f"Commands have been pushed to {device['dns']} successfully!")
     except Exception as e:
         print(f"Error processing device {device['dns']}: {e}")
     return output
@@ -552,7 +555,7 @@ def main() -> None:
         selected_policy: str
         cust_id: str
         selected_policy, cust_id = get_customer_prefix_list(prod_devices)
-        greenprint(f"\nYou have selected: {selected_policy}")
+        selection_print(f"\nYou have selected: {selected_policy}")
         user_decisions["Provided Cust ID"] = cust_id
         user_decisions["Selected policy"] = selected_policy
 
@@ -561,7 +564,7 @@ def main() -> None:
             "1": "Add prefixes",
             "2": "Remove prefixes"}
         user_input: str = user_choice(menu_add_or_remove)
-        greenprint(f"\nYou have selected: {menu_add_or_remove[user_input]}")
+        selection_print(f"\nYou have selected: {menu_add_or_remove[user_input]}")
         if user_input == "1":
             add_prefixes: bool = True
             remove_prefixes: bool = False
@@ -574,7 +577,8 @@ def main() -> None:
         valid_prefixes: List[str]
         prefix_confirm: str
         valid_prefixes, prefix_confirm = get_prefixes()
-        greenprint("User has confirmed the prefixes. Proceeding with generating commands...")
+        selection_print(f"\nUser has confirmed the prefixes. Proceeding with generating commands...")
+        print("")
         user_decisions["Provided Prefixes"] = valid_prefixes
         user_decisions["Prefix confirmation"] = prefix_confirm
         
@@ -583,7 +587,9 @@ def main() -> None:
         cmds_jnpr: List[str]
         config_confirm: str
         cmds_alu, cmds_jnpr, config_confirm = generate_commands(valid_prefixes, selected_policy, add_prefixes, remove_prefixes)
-        greenprint("\nUser has confirmed the commands. Proceeding with pushing the commands to the devices...\n")
+        print("")
+        selection_print("User has confirmed the commands. Proceeding with pushing the commands to the devices...")
+        print("")
         user_decisions["Nokia Configuration"] = cmds_alu
         user_decisions["Juniper Configuration"] = cmds_jnpr
         user_decisions["Configuration confirmation"] = config_confirm
@@ -604,10 +610,16 @@ def main() -> None:
 
         # Log the user's decisions
         log = parse_decisions(user_decisions)
-        with open(log_file_path, 'a') as file:
-            for line in log: file.write(line + "\n")
-        for line in log: 
-            print(line)
+        try:
+            with open(log_file_path, 'a') as file:
+                for line in log: file.write(line + "\n")
+            for line in log: 
+                if "SCRIPT LOG" in line: selection_print(line)
+                else: print(line)
+        except FileNotFoundError as e:
+            print(f"Error: {log_file_path} does not exist.")
+        except IOError as e:
+            print(f"Error opening file: {e}")
 
         print("Exiting program...")
         sys.exit(0)
