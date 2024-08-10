@@ -1,2 +1,3 @@
 tmp*
-__log__/__*
+__logs__/__*
+.__lock__/__pid_file__
