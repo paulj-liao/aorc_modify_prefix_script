@@ -1,0 +1,7 @@
+Username: rblackwe
+Timestamp: 2024-08-10 23:18:50
+Provided Cust ID: bank
+Selected policy: aorc-5-HFGGY3QG-TBCBANK
+Selected action: Add prefixes
+Provided Prefixes: ['1.1.0.0/32']
+Prefix confirmation: y

@@ -1,0 +1,22 @@
+Username: rblackwe
+Timestamp: 2024-08-10 23:23:34
+Provided Cust ID: mvl 
+Selected policy: aorc-1-23K-3786-MVL-037365
+Selected action: Add prefixes
+Provided Prefixes: ['1.1.1.1/32', '2.2.2.2/32']
+Prefix confirmation: y
+Nokia Configuration:
+/configure router policy-options abort
+/configure router policy-options begin
+/configure router policy-options prefix-list aorc-1-23K-3786-MVL-037365 prefix 1.1.1.1/32 longer
+/configure router policy-options prefix-list aorc-1-23K-3786-MVL-037365 prefix 2.2.2.2/32 longer
+/configure router policy-options commit
+admin save
+
+Juniper Configuration:
+edit private
+set policy-options policy-statement aorc-1-23K-3786-MVL-037365 term BGP from route-filter 1.1.1.1/32 orlonger
+set policy-options policy-statement aorc-1-23K-3786-MVL-037365 term BGP from route-filter 2.2.2.2/32 orlonger
+commit and-quit
+
+Configuration confirmation: y
