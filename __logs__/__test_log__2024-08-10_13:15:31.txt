@@ -1,4 +1,0 @@
-Username: rblackwe
-Timestamp: 2024-08-10 13:15:31
-Provided Cust ID: mvl 
-Selected policy: aorc-3-XCVJS43TNT-MVL-266103

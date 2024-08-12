@@ -1,0 +1,1 @@
+show router policy "ddos2-dynamic-check" | match prefix-list | match ignore-case north

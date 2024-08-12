@@ -1,7 +1,0 @@
-Username: rblackwe
-Timestamp: 2024-08-10 22:50:12
-Provided Cust ID: mvl 
-Selected policy: aorc-1-23K-3786-MVL-037365
-Selected action: Add prefixes
-Provided Prefixes: ['128.170.155.0/24', '1.1.1.0/30', '2.2.2.2/32', '137.237.1.10/32', '2001:db8:85a3::8a2e:370:7334/128']
-Prefix confirmation: y

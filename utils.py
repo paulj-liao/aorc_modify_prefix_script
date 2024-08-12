@@ -1,3 +1,5 @@
+#!/bin/env python3
+
 import ipaddress
 import subprocess
 import os
@@ -5,21 +7,19 @@ import grp
 import sys
 import multiprocessing
 import datetime
-import atexit
-import time
-import fcntl
 from subprocess import Popen, PIPE
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
-import threading
 from termcolor import colored
 
 horiz_line = "----------------------------------------------------------------------------------------"
 
 
-def important_print(text: str) -> None:
+def bad_print(text: str) -> None:
     print(colored(text, 'red', attrs=['bold']))
 
+def important_print(text: str) -> None:
+    print(colored(text, 'yellow', attrs=['bold']))
 
 def selection_print(text: str) -> None:
     print(colored(text, 'white', 'on_cyan', ['bold']))
@@ -50,7 +50,7 @@ def select_action(menu: Dict[str, str]) -> str:
         if choice in menu:
             break
         else:
-            important_print("Invalid choice. Please try again.")
+            bad_print("Invalid choice. Please try again.")
             continue
 
     return choice
@@ -68,13 +68,13 @@ def select_prefix_list(message: str, menu: dict) -> str:
         if choice in menu:
             break
         else:
-            important_print("Invalid choice. Please try again.")
+            bad_print("Invalid choice. Please try again.")
             continue
 
     return choice
 
 
-def get_customer_prefix_list(devices: List[Dict[str, str]]) -> Tuple[str, str]:
+def get_customer_prefix_list(devices: List[Dict[str, str]], alu_cmds_file_path: str, jnpr_cmds_file_path: str, dryrun_mode: bool) -> Tuple[str, str]:
     while True:
         # Prompt user to enter a unique identifier for the customer they want to work on
         cust_id: str = input("Please enter the customer name, BusOrg, BAN, MVL: ")
@@ -92,7 +92,7 @@ def get_customer_prefix_list(devices: List[Dict[str, str]]) -> Tuple[str, str]:
             file.close()
 
         # Search for the customer's prefix list in the devices using roci
-        found_prefix_list: List[str] = send_to_devices(search_config, devices, alu_cmds_file_path, jnpr_cmds_file_path)
+        found_prefix_list: List[str] = send_to_devices(search_config, devices, alu_cmds_file_path, jnpr_cmds_file_path, dryrun_mode)
         print(f"Search complete for customer \'{cust_id}\'.\n")
         
         # If no prefix lists were found, prompt the user to enter a different customer identifier
@@ -118,7 +118,7 @@ def get_customer_prefix_list(devices: List[Dict[str, str]]) -> Tuple[str, str]:
             selected_prefix: str = found_prefix_list_dict[user_input]
             return selected_prefix, cust_id
         else:
-            important_print("Invalid choice. Please try again.")
+            bad_print("Invalid choice. Please try again.")
             print("Starting a new search...")
             continue
 
@@ -154,14 +154,14 @@ def get_prefixes() -> Tuple[List[str], str]:
         # If invalid prefixes were entered, call them out to the user
         if invalid_prefixes:
             print(f"\n{horiz_line}")
-            important_print("The following prefixes are invalid and will be omitted.\n")
+            bad_print("The following prefixes are invalid and will be omitted.\n")
             for prefix in invalid_prefixes:
                 print(prefix)
 
         # Confirm the valid prefixes with the user
         if valid_prefixes:
             print(f"\n{horiz_line}")
-            selection_print("The following prefixes appear to be valid. Please confirm before proceeding:")
+            important_print("The following prefixes appear to be valid. Please confirm before proceeding:")
             print("")
             for prefix in valid_prefixes:
                 print(prefix)
@@ -170,10 +170,10 @@ def get_prefixes() -> Tuple[List[str], str]:
                 return valid_prefixes, confirmation
             else:
                 print(f"\n{horiz_line}")
-                important_print("Invlalid entry. Please re-enter the prefixes.")
+                bad_print("Invlalid entry. Please re-enter the prefixes.")
         else:
             print(f"\n{horiz_line}")
-            important_print("No valid prefixes were entered. Please re-enter all valid prefixes below:\n")
+            bad_print("No valid prefixes were entered. Please re-enter all valid prefixes below:\n")
 
 
 
@@ -183,7 +183,7 @@ def parse_prefixes(raw_list: List[str]) -> Tuple[List[str], List[str]]:
 
     for prefix in raw_list:
         prefix = str(prefix.strip())
-        if len(prefix) > 6: 
+        if len(prefix) > 0: 
             try:
                 # Convert the raw prefix into an IP network object
                 ip_object = ipaddress.ip_network(prefix, strict=False)
@@ -210,7 +210,7 @@ def separate_prefixes(valid_ips: List[str]) -> Tuple[List[str], List[str]]:
     return ipv4_prefixes, ipv6_prefixes
 
 
-def generate_commands(valid_prefixes: List[str], selected_policy: str, add_prefixes: bool, remove_prefixes: bool) -> Tuple[List[str], List[str], str]:
+def generate_commands(valid_prefixes: List[str], selected_policy: str, add_prefixes: bool, remove_prefixes: bool, test_mode: bool, dryrun: bool) -> Tuple[List[str], List[str], str]:
     # IMPORTANT: This function only generates modifications to the AORC prefix-lists. It does not modify the AORC policies
 
     # Nokia commands
@@ -276,16 +276,16 @@ def generate_commands(valid_prefixes: List[str], selected_policy: str, add_prefi
 
     # Prompt user to review commands before proceeding
     print(f"\n{horiz_line}")
-    print(f"\033[93mThis is your last chance to abort before the commands are pushed to the devices.\033[0m")
-    print("Please review the commands above before proceeding.")
+    important_print("This is your last chance to abort before the commands are pushed to the devices.")
+    important_print("Please review the commands above before proceeding.")
     if test_mode: 
-        print("\033[1m\033[91m\nTEST MODE: Reminder that You are in test mode.\033[0m")
-    if dry_run: 
-        print("\033[1m\033[91m\nDRYRUN: Reminder that You are in dryrun mode.\033[0m")
+        bad_print("TEST MODE: Reminder that You are in test mode.")
+    if dryrun: 
+        bad_print("DRYRUN: Reminder that You are in dryrun mode.")
     confirmation = input("\nAre the commands correct? (Y/N): ")
     if confirmation.lower() != 'y' and confirmation.lower() != 'yes':
-        important_print("User has not confirmed the commands. Restarting program...")
-        main()
+        bad_print("User has not confirmed the commands. Exiting program...")
+        sys.exit(1)
     
     return cmds_alu, cmds_jnpr, confirmation
 
@@ -296,7 +296,7 @@ def roci(roci_cmd: str) -> List[str]:
     return results
 
 
-def search_config(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
+def search_config(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str, dryrun: bool) -> List[str]:
     found_prefix_list = []
     try:
         print(f"Searching {device['dns']}...")
@@ -321,31 +321,32 @@ def search_config(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: st
     return found_prefix_list
 
 
-def push_changes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
+def push_changes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str, dryrun: bool) -> List[str]:
     output = []
     try:
-        # print(f"Pushing commands to {device['dns']}...")
         # Nokia devices
         if device['manufacturer'] == "Nokia":
             roci_cmd = f"roci {device['dns']} -hidecmd -f={alu_cmds_file}"
         # Juniper devices
         elif device['manufacturer'] == "Juniper":
             roci_cmd = f"roci {device['dns']} -hidecmd -f={jnpr_cmds_file}"
-        if not dry_run:
+        if not dryrun:
             roci_results = roci(roci_cmd)
+            print(f"Commands have been pushed to {device['dns']}")
         else:
             roci_results = [f"DRYRUN: Command not executed on {device}"]
+            print(f"DRYRUN: Commands have not been pushed to {device['dns']}")
         for result in roci_results:
             output.append(result)
-        print(f"Commands have been pushed to {device['dns']}")
+        
     except Exception as e:
         print(f"Error processing device {device['dns']}: {e}")
     return output
 
 
-def send_to_devices(purpose: callable, devices: List[Dict[str, str]], alu_cmds_file: str, jnpr_cmds_file: str) -> List[str]:
+def send_to_devices(purpose: callable, devices: List[Dict[str, str]], alu_cmds_file: str, jnpr_cmds_file: str, dryrun: bool) -> List[str]:
     try:
-        job_list = [(device, alu_cmds_file, jnpr_cmds_file) for device in devices]
+        job_list = [(device, alu_cmds_file, jnpr_cmds_file, dryrun) for device in devices]
         with multiprocessing.Pool(processes=len(job_list)) as pool:
             results = pool.starmap(purpose, job_list)
         
@@ -357,7 +358,7 @@ def send_to_devices(purpose: callable, devices: List[Dict[str, str]], alu_cmds_f
     return output
 
 
-def add_to_log(log_dict: Dict[str, str], key: str, value: str) -> Dict[str, str]:
+def add_to_log(log_file_path: str, log_dict: Dict[str, str], key: str, value: str) -> Dict[str, str]:
         log_dict[key] = value
         try:
             with open(log_file_path, 'a') as file:
@@ -372,24 +373,29 @@ def add_to_log(log_dict: Dict[str, str], key: str, value: str) -> Dict[str, str]
             print(f"An error occurred while writing to log file: {e}")
 
 
-def write_pid_lock():
+def write_pid_lock(pid_file_path: str) -> None:
     with open(pid_file_path, 'w') as pid_lock_file:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        username = os.getlogin()
+        timestamp: str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        username: str = os.getlogin()
         pid_lock_file.write(f"Timestamp: {timestamp}\n")
         pid_lock_file.write(f"Username: {username}\n")
 
 
-def read_pid_lock():
+def read_pid_lock(pid_file_path: str) -> str:
     with open(pid_file_path, 'r') as pid_lock_file:
-        contents = pid_lock_file.read()
+        contents: str = pid_lock_file.read()
     return contents
 
 
-def get_time_lapsed(timestamp_str):
+def get_time_lapsed(timestamp_str: str):
     timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
     current_time = datetime.now()
     time_lapsed = current_time - timestamp
     return time_lapsed
+
+
+
+
+
 
 

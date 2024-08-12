@@ -1,9 +1,0 @@
-Username: rblackwe
-Timestamp: 2024-08-09 20:50:35
-Selected policy: aorc-1-23K-3786-MVL-037365
-Selected policy: aorc-1-23K-3786-MVL-037365
-Selected action: Remove prefixes
-Provided Prefixes: ['1.1.1.1/32']
-Prefix confirmation: y
-Username: rblackwe
-Timestamp: 2024-08-09 20:55:10
