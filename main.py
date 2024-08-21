@@ -91,7 +91,7 @@ test_devices = [
 prod_devices = [
     {'manufacturer': 'Juniper', 'dns': 'edge9.sjo1'},
     {'manufacturer': 'Juniper', 'dns': 'edge3.chi10'},
-    {'manufacturer': 'Juniper', 'dns': 'edge3.syd1'},
+    {'manufacturer': 'Juniper', 'dns': 'edge4.syd1'},
     {'manufacturer': 'Nokia',   'dns': 'ear3.ams1'},
     {'manufacturer': 'Nokia',   'dns': 'msr2.frf1'},
     {'manufacturer': 'Nokia',   'dns': 'msr3.frf1'},
