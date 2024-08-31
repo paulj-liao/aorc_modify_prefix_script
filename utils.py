@@ -11,8 +11,44 @@ from subprocess import Popen, PIPE
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 from termcolor import colored
+from rich import print as rprint
+from rich.panel import Panel
+from rich.console import Console
 
-horiz_line = "----------------------------------------------------------------------------------------"
+
+console = Console()
+panel_width = 100 # Width of the output panels
+
+
+def rich_bad_print(text: str) -> None:
+    rprint(Panel(text, style="bold red", width=panel_width))
+
+def rich_important_print(text: str) -> None:
+    rprint(Panel(text, style="bold yellow", width=panel_width))
+
+def rich_selection_print(text: str) -> None:
+    rprint(Panel(text, border_style="bold cyan", width=panel_width))
+
+def rich_bold_print(text: str) -> None:
+    rprint(Panel(text, style="bold", width=panel_width))
+
+def rich_print(text: str) -> None:
+    rprint(Panel(text, width=panel_width))
+
+def rich_success_print(text: str) -> None:
+    rprint(Panel(text, style="bold green", width=panel_width, border_style="green on black"))
+
+def make_banner(text: str) -> str:
+    banner = ""
+    for line in text.split("\n"):
+        while len(line) < (int(panel_width) - 4):
+            line = f" {line} "
+        banner += f"{line}\n"
+    return banner
+
+def print_banner(text: str) -> None:
+    banner = make_banner(text)
+    rprint(Panel(banner, style="bold", width=panel_width))
 
 
 def bad_print(text: str) -> None:
@@ -23,7 +59,6 @@ def important_print(text: str) -> None:
 
 def selection_print(text: str) -> None:
     print(colored(text, 'white', 'on_cyan', ['bold']))
-
 
 def bold_print(text: str) -> None:
     print(colored(text, attrs=['bold']))
@@ -39,37 +74,17 @@ def is_member_of_group(group_name: str) -> bool:
  
 def select_action(menu: Dict[str, str]) -> str:
     while True:
-        print(f"\n{horiz_line}\n"
-              "What action would you like the program to perform? \n")
-
-        for key, value in menu.items():
-            print(f"{key}: {value}")
-
-        choice: str = input("\nPlease enter the number corresponding to the choice you wish to make: ")
-        choice = str(choice.strip())
-        if choice in menu:
-            break
-        else:
-            bad_print("Invalid choice. Please try again.")
-            continue
-
-    return choice
-
-
-def select_prefix_list(message: str, menu: dict) -> str:
-    while True:
-        print(f"\n{horiz_line}\n{message}\n")
-
-        for key, value in menu.items():
-            print(f"{key}: {value}")
+        print("Please select an action from the menu below:")
+        menu_content = "\n".join([f"{key}: {value}" for key, value in menu.items()])
+        panel = Panel(menu_content, width=panel_width)
+        console.print(panel)
 
         choice: str = input("\nPlease enter the number corresponding to the choice you wish to make: ")
         choice = str(choice.strip())
         if choice in menu:
             break
         else:
-            bad_print("Invalid choice. Please try again.")
-            continue
+            rich_bad_print("Invalid choice. Please try again.")
 
     return choice
 
@@ -79,66 +94,60 @@ def get_customer_prefix_list(devices: List[Dict[str, str]], alu_cmds_file_path: 
         # Prompt user to enter a unique identifier for the customer they want to work on
         cust_id: str = input("Please enter the customer name, BusOrg, BAN, MVL: ")
         cust_id_str = str(cust_id.strip())
-        selection_print(f"\nSearching for customer \'{cust_id_str}\'...\n")
-
+        rich_selection_print(f"Searching for customer '{cust_id_str}'...")    
         # Generate commands to search for the customer's prefix list in the Juniper and Nokia PE routers.
         alu_cmd: str = f"show router policy \"ddos2-dynamic-check\" | match prefix-list | match ignore-case {cust_id}"
         with open(alu_cmds_file_path, 'w+') as file:
             file.write(alu_cmd)
-            file.close()
         jnpr_cmd: str = f"show configuration policy-options | display set | match ddos2-dynamic-check | match \"from policy\" | match {cust_id}"
         with open(jnpr_cmds_file_path, 'w+') as file:
-            file.write(jnpr_cmd)
-            file.close()
-
+            file.write(jnpr_cmd)    
         # Search for the customer's prefix list in the devices using roci
         found_prefix_list: List[str] = send_to_devices(search_config, devices, alu_cmds_file_path, jnpr_cmds_file_path, dryrun_mode)
-        print(f"Search complete for customer \'{cust_id}\'.\n")
-        
+        print(f"Search complete for customer '{cust_id}'.\n")
+
         # If no prefix lists were found, prompt the user to enter a different customer identifier
         if not found_prefix_list:
-            print("No matches found. Please provide a different customer identifier.")
-            continue
-
+            rich_bad_print("[bold red]No matches found. Please provide a different customer identifier.[/bold red]")
+            continue    
         # Sort and Remove duplicates from the list of found prefix lists
-        found_prefix_list = sorted(list(set(found_prefix_list)))
-
+        found_prefix_list = sorted(list(set(found_prefix_list)))    
         # Create a dictionary with the found policies
-        found_prefix_list_dict: Dict[str, str] = {str(i+1): match for i, match in enumerate(found_prefix_list)}
-
+        found_prefix_list_dict: Dict[str, str] = {str(i+1): match for i, match in enumerate(found_prefix_list)} 
         # Display matching prefix lists and prompt user to select the correct one
         found_prefix_list_dict[str(len(found_prefix_list_dict) + 1)] = "New search"
-        user_input: str = select_prefix_list("Which prefix-list would you like to modify?", found_prefix_list_dict)
+        menu_content = "\n".join([f"{key}: {value}" for key, value in found_prefix_list_dict.items()])
+        while True:
+            panel = Panel(f"Which prefix-list would you like to modify?\n\n{menu_content}", width = panel_width)
+            console.print(panel)
 
-        # If the user wants to start a new search, restart the loop
-        if user_input == str(len(found_prefix_list_dict)):
-            print("Starting a new search...")
-            continue
-        elif user_input in found_prefix_list_dict:
-            selected_prefix: str = found_prefix_list_dict[user_input]
-            return selected_prefix, cust_id
-        else:
-            bad_print("Invalid choice. Please try again.")
-            print("Starting a new search...")
-            continue
+            user_input: str = input("\nPlease enter the number corresponding to the choice you wish to make: ").strip()
+
+            # If the user wants to start a new search, restart the loop
+            if user_input == str(len(found_prefix_list_dict)):
+                rich_selection_print("Starting a new search...")
+                break
+            elif user_input in found_prefix_list_dict:
+                selected_prefix: str = found_prefix_list_dict[user_input]
+                return selected_prefix, cust_id
+            else:
+                rich_bad_print("Invalid choice. Please try again")
+
 
 def get_prefixes() -> Tuple[List[str], str]:
     while True:
         # Prompt user to enter prefixes
-        print(f"\n{horiz_line}")
-        bold_print("Follow instructions below to enter prefixes")
-        print("   • Only one prefix per line. Please see example below:")
-        print("         example: 1.1.0.0/16")
-        print("                  1.1.1.1/32")
-        print("   • Prefixes can be entered with or without CIDR notation")
-        print("         example: 1.1.1.1 will become 1.1.1.1/32")
-        print("   • Single IPs entered with CIDR notation will be converted to network address")
-        print("         example: 1.1.1.1/24 will become 1.1.1.0/24")
-        print("   • IPv4 and IPv6 prefixes are accepted")
-        print()
-        bold_print("Press ENTER on an empty line when you are done entering prefixes")
-        print(f"{horiz_line}")
-        
+        console.print(Panel("Follow instructions below to enter prefixes\n\n"
+                            "   • Only one prefix per line. Please see example below:\n"
+                            "         example: 1.1.0.0/16\n"
+                            "                  1.1.1.1/32\n"
+                            "   • Prefixes can be entered with or without CIDR notation\n"
+                            "         example: 1.1.1.1 will become 1.1.1.1/32\n"
+                            "   • Single IPs entered with CIDR notation will be converted to network address\n"
+                            "         example: 1.1.1.1/24 will become 1.1.1.0/24\n"
+                            "   • IPv4 and IPv6 prefixes are accepted\n\n"
+                            "Press ENTER on an empty line when you are done entering prefixes", 
+                            width=panel_width))
         prefixes: List[str] = []
         while True:
             prefix: str = input()
@@ -153,28 +162,18 @@ def get_prefixes() -> Tuple[List[str], str]:
         
         # If invalid prefixes were entered, call them out to the user
         if invalid_prefixes:
-            print(f"\n{horiz_line}")
-            bad_print("The following prefixes are invalid and will be omitted.\n")
-            for prefix in invalid_prefixes:
-                print(prefix)
+            console.print(Panel("The following prefixes are invalid and will be omitted.\n\n" + "\n".join(invalid_prefixes), style="bold red", border_style="bold", width=panel_width))
 
         # Confirm the valid prefixes with the user
         if valid_prefixes:
-            print(f"\n{horiz_line}")
-            important_print("The following prefixes appear to be valid. Please confirm before proceeding:")
-            print("")
-            for prefix in valid_prefixes:
-                print(prefix)
+            console.print(Panel("The following prefixes are valid. Please confirm before proceeding:\n\n" + "\n".join(valid_prefixes), style="bold", border_style="bold", width=panel_width))
             confirmation: str = input("\nAre the prefixes correct? (Y/N): ")
             if confirmation.lower() in ['y', 'yes']:
                 return valid_prefixes, confirmation
             else:
-                print(f"\n{horiz_line}")
-                bad_print("Invlalid entry. Please re-enter the prefixes.")
+                console.print(Panel("Invalid entry. Please re-enter the prefixes.", style="bold red", border_style="bold", width=panel_width))
         else:
-            print(f"\n{horiz_line}")
-            bad_print("No valid prefixes were entered. Please re-enter all valid prefixes below:\n")
-
+            console.print(Panel("No valid prefixes were entered. Please re-enter all valid prefixes below:", style="bold red", border_style="bold", width=panel_width))
 
 
 def parse_prefixes(raw_list: List[str]) -> Tuple[List[str], List[str]]:
@@ -260,33 +259,33 @@ def generate_commands(valid_prefixes: List[str], selected_policy: str, add_prefi
                 cmds_jnpr.append(f"delete policy-options policy-statement {v6_selected_policy} term BGP from route-filter {prefix} orlonger")
     cmds_jnpr.append("commit and-quit\n")
 
-    # Print generated commands for Nokia and Juniper devices
-    print(f"\n{horiz_line}")
-    print("Commands have been generated for Nokia and Juniper devices. Please review below:")
-    
-    # Print Nokia commands
-    print("\nNokia commands:")
-    for line in cmds_alu:
-        print(line)
+    while True:
+        # Print generated commands for Nokia and Juniper devices
+        print("\nCommands have been generated for Nokia and Juniper devices. Please review below:\n")
 
-    # Print Juniper commands
-    print("\nJuniper commands:")
-    for line in cmds_jnpr:
-        print(line)
+        # Print Nokia commands
+        print("Nokia commands:")
+        for line in cmds_alu:
+            print(line)
 
-    # Prompt user to review commands before proceeding
-    print(f"\n{horiz_line}")
-    important_print("This is your last chance to abort before the commands are pushed to the devices.")
-    important_print("Please review the commands above before proceeding.")
-    if test_mode: 
-        bad_print("TEST MODE: Reminder that You are in test mode.")
-    if dryrun: 
-        bad_print("DRYRUN: Reminder that You are in dryrun mode.")
-    confirmation = input("\nAre the commands correct? (Y/N): ")
-    if confirmation.lower() != 'y' and confirmation.lower() != 'yes':
-        bad_print("User has not confirmed the commands. Exiting program...")
-        sys.exit(1)
-    
+        # Print Juniper commands
+        print("Juniper commands:")
+        for line in cmds_jnpr:
+            print(line)
+
+        # Prompt user to review commands before proceeding
+        rich_important_print("This is your last chance to abort before the commands are pushed to production devices.\nPlease review the commands above before proceeding.")
+        if test_mode: 
+            rich_important_print("TEST MODE: Reminder that You are in test mode.")
+        if dryrun: 
+            rich_important_print("DRYRUN: Reminder that You are in dryrun mode.")
+        confirmation = input("\nAre the commands correct? (Y/N): ")
+        if confirmation.lower() in ['y', 'yes']:
+            break
+        else:
+            rich_bad_print("User has aborted. Exiting program.")
+            sys.exit(0)
+
     return cmds_alu, cmds_jnpr, confirmation
 
 
