@@ -1,0 +1,16 @@
+        policy-options
+            prefix-list "aorc-5-BRNDLYCS-NZRAMOSTELECOMU"
+                prefix 143.208.88.0/22 longer
+                prefix 170.83.0.0/22 longer
+                prefix 179.0.124.0/22 longer
+                prefix 2804:3814::/32 longer
+            policy-statement "ddos2-dynamic-check"
+                entry 3260
+                    description "aorc-5-BRNDLYCS-NZRAMOSTELECOMU"
+                    from
+                        prefix-list "aorc-5-BRNDLYCS-NZRAMOSTELECOMU"
+            policy-statement "ipv6-ddos2-dynamic-check"
+                entry 1600
+                    description "aorc-5-BRNDLYCS-NZRAMOSTELECOMU"
+                    from
+                        prefix-list "aorc-5-BRNDLYCS-NZRAMOSTELECOMU"

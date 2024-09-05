@@ -33,7 +33,7 @@ script_path = "/export/home/rblackwe/scripts/aorc_modify_prefix_script"
 
 # Log file path
 log_file_path = (f"{script_path}/__logs__/__log__{tstamp}.txt")
-if dryrun or test_mode: log_file_path = (f"{script_path}/__logs__/__test_log__{tstamp}.txt")
+if dryrun or test_mode: log_file_path = (f"{script_path}/__logs__/test_log__{tstamp}.txt")
 
 # Lock file paths
 lock_file_path = (f'{script_path}/__lock__/__lock_file__')
@@ -65,7 +65,7 @@ lumen_banner = f"""
 
 script_banner = f"""
 The purpose of this script is to allow the DDoS SOC
-to add and remove prefixes from existing AORC customer's policies
+to add and remove prefixes from existing AORC customer policies
 
 Additional info can be found here:
 https://nsmomavp045b.corp.intranet:8443/display/SOPP/AORC+Only+Modify+Prefix-list+Script"""

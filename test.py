@@ -1,48 +1,32 @@
-from rich.panel import Panel
-from rich.console import Console
-from rich import print as rprint
+def flatten_config(file_path):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
 
-panel_width = 100
+    stack = []
+    flat_config = []
 
-lumen_banner = f"""
-██╗     ██╗   ██╗███╗   ███╗███████╗███╗   ██╗
-██║     ██║   ██║████╗ ████║██╔════╝████╗  ██║
-██║     ██║   ██║██╔████╔██║█████╗  ██╔██╗ ██║
-██║     ██║   ██║██║╚██╔╝██║██╔══╝  ██║╚██╗██║
-███████╗╚██████╔╝██║ ╚═╝ ██║███████╗██║ ╚████║
-╚══════╝ ╚═════╝ ╚═╝     ╚═╝╚══════╝╚═╝  ╚═══╝
+    for line in lines:
+        stripped_line = line.strip()
+        if not stripped_line:
+            continue
 
-╭──────────────────────────────────────────────────╮
-│               Lumen DDoS Security                │
-│                                                  │
-│        DDoS AORC Modify Prefix-List Script       │
-│                                                  │
-│    For issues with this script, please reach     │
-│             out to Richard Blackwell             │
-│                                                  │
-│           Richard.Blackwell@lumen.com            │
-╰──────────────────────────────────────────────────╯"""
+        indent_level = len(line) - len(stripped_line)
+        
+        while stack and stack[-1][1] >= indent_level:
+            stack.pop()
 
-script_banner = f"""
-The purpose of this script is to allow the DDoS SOC
-to add and remove prefixes from existing AORC customer's policies
+        if stack:
+            prefix = '.'.join(item[0] for item in stack)
+            flat_config.append(f"{prefix} {stripped_line}")
+        else:
+            flat_config.append(stripped_line)
 
-Additional info can be found here:
-https://nsmomavp045b.corp.intranet:8443/display/SOPP/AORC+Only+Modify+Prefix-list+Script"""
+        stack.append((stripped_line, indent_level))
 
-def make_banner(text: str) -> str:
-    banner = ""
-    for line in text.split("\n"):
-        while len(line) < (panel_width - 4):
-            line = f" {line} "
-        banner += f"{line}\n"
-    return banner
+    return flat_config
 
-def print_banner(text: str) -> None:
-    banner = make_banner(text)
-    rprint(Panel(banner, style="bold", width=panel_width))
-
-print_banner(lumen_banner)
-print_banner(script_banner)
-
-
+# Example usage
+file_path = 'config.txt'
+flat_config = flatten_config(file_path)
+for line in flat_config:
+    print(line)

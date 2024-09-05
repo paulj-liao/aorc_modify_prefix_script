@@ -10,7 +10,6 @@ import datetime
 from subprocess import Popen, PIPE
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
-from termcolor import colored
 from rich import print as rprint
 from rich.panel import Panel
 from rich.console import Console
@@ -27,7 +26,7 @@ def rich_important_print(text: str) -> None:
     rprint(Panel(text, style="bold yellow", width=panel_width))
 
 def rich_selection_print(text: str) -> None:
-    rprint(Panel(text, border_style="bold cyan", width=panel_width))
+    rprint(Panel(text, border_style="bold cyan", style = "bold", width=panel_width))
 
 def rich_bold_print(text: str) -> None:
     rprint(Panel(text, style="bold", width=panel_width))
@@ -49,19 +48,6 @@ def make_banner(text: str) -> str:
 def print_banner(text: str) -> None:
     banner = make_banner(text)
     rprint(Panel(banner, style="bold", width=panel_width))
-
-
-def bad_print(text: str) -> None:
-    print(colored(text, 'red', attrs=['bold']))
-
-def important_print(text: str) -> None:
-    print(colored(text, 'yellow', attrs=['bold']))
-
-def selection_print(text: str) -> None:
-    print(colored(text, 'white', 'on_cyan', ['bold']))
-
-def bold_print(text: str) -> None:
-    print(colored(text, attrs=['bold']))
 
 
 def is_member_of_group(group_name: str) -> bool:
