@@ -18,13 +18,14 @@ from utils import send_to_devices, select_action, get_prefixes, generate_command
 
 # Author: Richard Blackwell
 # Date: 1 August 2024 
-# Version: 0.2.0
+# Version: 0.3.0
 
 # 08/1/2024 - 0.1.0 - Initial version of the script
 # 08/31/2024 - 0.2.0 - Incorporated the Rich module for all output
+# 09/15/2024 - 0.3.0 - Added launch.sh
 
 
-test_mode = False # test_mode will ensure that the script only runs on the test devices
+test_mode = True # test_mode will ensure that the script only runs on the test devices
 dryrun = True # dry_run will ensure that the script only generates the commands but does not push them to the devices
 total_time_limit = 600 # Total time limit for the script to run in seconds
 group_name = "ddosops" # Group name for the users who are allowed to run this script
@@ -80,24 +81,24 @@ test_devices = [
 
 # Complplete list of production PE routers that participate with the local scrubbers. 
 prod_devices = [
-    # {'manufacturer': 'Juniper', 'dns': 'edge9.sjo1'},
-    # {'manufacturer': 'Juniper', 'dns': 'edge3.chi10'},
-    # {'manufacturer': 'Juniper', 'dns': 'edge4.syd1'},
-    # {'manufacturer': 'Nokia',   'dns': 'ear3.ams1'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr2.frf1'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr3.frf1'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr11.hkg3'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr12.hkg3'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr2.lax1'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr3.lax1'},
-    # {'manufacturer': 'Nokia',   'dns': 'ear4.lon2'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr1.nyc1'},
-    # {'manufacturer': 'Nokia',   'dns': 'ear2.par1'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr11.sap1'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr12.sap1'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr11.sng3'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr12.sng3'},
-    # {'manufacturer': 'Nokia',   'dns': 'msr11.tok4'},
+    {'manufacturer': 'Juniper', 'dns': 'edge9.sjo1'},
+    {'manufacturer': 'Juniper', 'dns': 'edge3.chi10'},
+    {'manufacturer': 'Juniper', 'dns': 'edge4.syd1'},
+    {'manufacturer': 'Nokia',   'dns': 'ear3.ams1'},
+    {'manufacturer': 'Nokia',   'dns': 'msr2.frf1'},
+    {'manufacturer': 'Nokia',   'dns': 'msr3.frf1'},
+    {'manufacturer': 'Nokia',   'dns': 'msr11.hkg3'},
+    {'manufacturer': 'Nokia',   'dns': 'msr12.hkg3'},
+    {'manufacturer': 'Nokia',   'dns': 'msr2.lax1'},
+    {'manufacturer': 'Nokia',   'dns': 'msr3.lax1'},
+    {'manufacturer': 'Nokia',   'dns': 'ear4.lon2'},
+    {'manufacturer': 'Nokia',   'dns': 'msr1.nyc1'},
+    {'manufacturer': 'Nokia',   'dns': 'ear2.par1'},
+    {'manufacturer': 'Nokia',   'dns': 'msr11.sap1'},
+    {'manufacturer': 'Nokia',   'dns': 'msr12.sap1'},
+    {'manufacturer': 'Nokia',   'dns': 'msr11.sng3'},
+    {'manufacturer': 'Nokia',   'dns': 'msr12.sng3'},
+    {'manufacturer': 'Nokia',   'dns': 'msr11.tok4'},
     {'manufacturer': 'Nokia',   'dns': 'msr2.wdc12'},
     {'manufacturer': 'Nokia',   'dns': 'msr3.wdc12'},
     {'manufacturer': 'Nokia',   'dns': 'msr1.dal1'}
@@ -123,7 +124,7 @@ def timeout():
 # Check if the resource is locked. If it is, wait for it to be released
 def lock_resource():
     attempt_limit = 4 # Number of attempts to acquire lock
-    wait_time = 5 # Time to wait before retrying
+    wait_time = 2 # Time to wait before retrying
     timer = threading.Timer(total_time_limit, timeout)
     timer.start()   
 

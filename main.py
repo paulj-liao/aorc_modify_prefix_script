@@ -17,15 +17,17 @@ from utils import send_to_devices, select_action, get_prefixes, generate_command
 
 
 # Author: Richard Blackwell
-# Date: 1 August 2024 
-# Version: 0.2.0
+# Date: 23 September 2024 
+# Version: 0.2.2
 
 # 08/1/2024 - 0.1.0 - Initial version of the script
 # 08/31/2024 - 0.2.0 - Incorporated the Rich module for all output
+# 09/15/2024 - 0.2.1 - Added launch.sh. Restricited prefixes larger than /8 from being added
+# 09/23/2024 - 0.2.2 - Added ROCI duration timer to log. Hardcoded file permissions
 
 
-test_mode = False # test_mode will ensure that the script only runs on the test devices
 dryrun = True # dry_run will ensure that the script only generates the commands but does not push them to the devices
+test_mode = False # test_mode will ensure that the script only runs on the test devices
 total_time_limit = 600 # Total time limit for the script to run in seconds
 group_name = "ddosops" # Group name for the users who are allowed to run this script
 tstamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
@@ -117,13 +119,17 @@ def cleanup_files() -> None:
 # Function to Kill the program after the time limit has been reached
 def timeout():
     print()
-    rich_bad_print(f"Time's up! This program has a time limit of {int(total_time_limit/60)} minute(s). Exiting program.")
+    if int(total_time_limit) > 60:
+        time_limit = f"{int(total_time_limit/60)} minute(s)"
+    else:
+        time_limit = f"{int(total_time_limit)} seconds"
+    rich_bad_print(f"\nTime's up! This program has a time limit of {time_limit}. Exiting program.\n")
     os._exit(1)
 
 
 # Check if the resource is locked. If it is, wait for it to be released
 def lock_resource():
-    attempt_limit = 4 # Number of attempts to acquire lock
+    attempt_limit = 5 # Number of attempts to acquire lock
     wait_time = 5 # Time to wait before retrying
     timer = threading.Timer(total_time_limit, timeout)
     timer.start()   
@@ -152,21 +158,22 @@ def lock_resource():
                     time_lapsed = get_time_lapsed(info["Timestamp"])
                     # Print the message to the user including the user who is running the script and the time lapsed
                     already_runner_banner = (
-                            f"\nThis program is already in use. Only one instance of this script can be run at one time.\n"
+                            f"\nFailed to acuqire lock!\nThis program is already in use. Only one instance of this script can be run at one time.\n"
                             f"User '{info['Username']}' is already running this program. Time lapsed: {str(time_lapsed)[:8]}\n")
                     rich_bad_print(already_runner_banner)
 
                     # If the user wants to retry, wait for the specified time before retrying
-                    if attempt < attempt_limit - 1:
+                    if (attempt + 1) < attempt_limit:
                         retry = input("Do you want to try again? (Y/YES to retry): ").strip().upper()
                         if retry not in ['Y', 'YES']:
                             rich_bad_print("Exiting program...")
                             sys.exit(1)
+                        print(f"Attempt {attempt + 2} of {attempt_limit} to acquire lock.")
                         print(f"Retrying in {wait_time} seconds...")
                         time.sleep(wait_time)
                     else:
-                        rich_bad_print(f"Failed to acquire lock after {attempt_limit} attempts.\n"
-                                       "You have reached the maximum number of attempts. Exiting program.")
+                        rich_bad_print(f"Attempt limit exceeded!\n"
+                                       f"Failed to acquire lock after {attempt_limit} attempts. Exiting program.")
                         sys.exit(1)
                 
                 # Release the lock
@@ -217,8 +224,9 @@ def main() -> None:
         # Get the customer's prefix-list
         selected_policy: str
         cust_id: str
-        selected_policy, cust_id = get_customer_prefix_list(prod_devices, alu_cmds_file_path, jnpr_cmds_file_path, dryrun)
+        selected_policy, cust_id, search_time = get_customer_prefix_list(prod_devices, alu_cmds_file_path, jnpr_cmds_file_path, dryrun)
         user_decisions = add_to_log(log_file_path, user_decisions, "Provided Cust ID", cust_id)
+        user_decisions = add_to_log(log_file_path, user_decisions, "Search time (seconds)", int(float(search_time)))
         user_decisions = add_to_log(log_file_path, user_decisions, "Selected policy", selected_policy)
         rich_selection_print(f"You have selected: {selected_policy}")
 
@@ -265,15 +273,18 @@ def main() -> None:
 
         # Write the commands to the configuration files
         with open(alu_cmds_file_path, 'w+') as file:
+            os.chmod(alu_cmds_file_path, 0o644)
             for line in cmds_alu:
                 file.write(line + "\n")
             file.close()
         with open(jnpr_cmds_file_path, 'w+') as file:
+            os.chmod(jnpr_cmds_file_path, 0o644)
             for line in cmds_jnpr:
                 file.write(line + "\n")
             file.close()
         if config_confirm: 
-                output = send_to_devices(push_changes, devices, alu_cmds_file_path, jnpr_cmds_file_path, dryrun)
+                output, push_time = send_to_devices(push_changes, devices, alu_cmds_file_path, jnpr_cmds_file_path, dryrun)
+                user_decisions = add_to_log(log_file_path, user_decisions, "Config push time (seconds)", int(float(push_time)))
         print("")
         rich_success_print(f"\nConfiguration changes have been pushed to the devices successfully!\n")
 

@@ -7,9 +7,10 @@ import grp
 import sys
 import multiprocessing
 import datetime
+import time
 from subprocess import Popen, PIPE
 from datetime import datetime
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Callable
 from rich import print as rprint
 from rich.panel import Panel
 from rich.console import Console
@@ -80,17 +81,21 @@ def get_customer_prefix_list(devices: List[Dict[str, str]], alu_cmds_file_path: 
         # Prompt user to enter a unique identifier for the customer they want to work on
         cust_id: str = input("Please enter the customer name, BusOrg, BAN, MVL: ")
         cust_id_str = str(cust_id.strip())
-        rich_selection_print(f"Searching for customer '{cust_id_str}'...")    
+        if cust_id_str == "":
+            rich_bad_print("[bold red]Invalid customer identifier. Please try again.[/bold red]")
+            continue
+        rich_selection_print(f"Searching for '{cust_id_str}'")    
         # Generate commands to search for the customer's prefix list in the Juniper and Nokia PE routers.
         alu_cmd: str = f"show router policy \"ddos2-dynamic-check\" | match prefix-list | match ignore-case {cust_id}"
         with open(alu_cmds_file_path, 'w+') as file:
+            os.chmod(alu_cmds_file_path, 0o644)
             file.write(alu_cmd)
         jnpr_cmd: str = f"show configuration policy-options | display set | match ddos2-dynamic-check | match \"from policy\" | match {cust_id}"
         with open(jnpr_cmds_file_path, 'w+') as file:
+            os.chmod(jnpr_cmds_file_path, 0o644)
             file.write(jnpr_cmd)    
         # Search for the customer's prefix list in the devices using roci
-        found_prefix_list: List[str] = send_to_devices(search_config, devices, alu_cmds_file_path, jnpr_cmds_file_path, dryrun_mode)
-        print(f"Search complete for customer '{cust_id}'.\n")
+        found_prefix_list, roci_duration = send_to_devices(search_config, devices, alu_cmds_file_path, jnpr_cmds_file_path, dryrun_mode)
 
         # If no prefix lists were found, prompt the user to enter a different customer identifier
         if not found_prefix_list:
@@ -115,7 +120,7 @@ def get_customer_prefix_list(devices: List[Dict[str, str]], alu_cmds_file_path: 
                 break
             elif user_input in found_prefix_list_dict:
                 selected_prefix: str = found_prefix_list_dict[user_input]
-                return selected_prefix, cust_id
+                return selected_prefix, cust_id, roci_duration
             else:
                 rich_bad_print("Invalid choice. Please try again")
 
@@ -172,6 +177,12 @@ def parse_prefixes(raw_list: List[str]) -> Tuple[List[str], List[str]]:
             try:
                 # Convert the raw prefix into an IP network object
                 ip_object = ipaddress.ip_network(prefix, strict=False)
+
+                # Check if the CIDR of the ip_object is less than 8
+                if ip_object.prefixlen < 8:
+                    invalid_ips.append(prefix)
+                    continue
+
                 # Append the network address to the prefix_list
                 valid_ips.append(str(ip_object))
             except ValueError:
@@ -260,9 +271,9 @@ def generate_commands(valid_prefixes: List[str], selected_policy: str, add_prefi
             print(line)
 
         # Prompt user to review commands before proceeding
-        rich_important_print("This is your last chance to abort before the commands are pushed to production devices.\nPlease review the commands above before proceeding.")
+        rich_important_print("THIS IS YOUR LAST CHANCE TO ABORT BEFORE THE COMMANDS ARE PUSHED TO PRODUCTION DEVICES.\nPLEASE REVIEW THE COMMANDS ABOVE BEFORE PROCEEDING.")
         if test_mode: 
-            rich_important_print("TEST MODE: Reminder that You are in test mode.")
+            rich_important_print("TEST MODE: Reminder that only lab devices will be touched.")
         if dryrun: 
             rich_important_print("DRYRUN: Reminder that You are in dryrun mode.")
         confirmation = input("\nAre the commands correct? (Y/N): ")
@@ -284,7 +295,7 @@ def roci(roci_cmd: str) -> List[str]:
 def search_config(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str, dryrun: bool) -> List[str]:
     found_prefix_list = []
     try:
-        print(f"Searching {device['dns']}...")
+        # print(f"Searching {device['dns']}...")
         # Nokia devices
         if device['manufacturer'] == "Nokia":
             roci_cmd = f"roci {device['dns']} -hidecmd -f={alu_cmds_file}"
@@ -301,6 +312,7 @@ def search_config(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: st
                 words = result.split(" ")
                 if len(words) > 4: # Juniper prefix list are stored in the 5th column
                     found_prefix_list.append(words[5])
+        print(f"Completed searching {device['dns']}")
     except Exception as e:
         print(f"Error processing device {device['dns']}: {e}")
     return found_prefix_list
@@ -317,7 +329,7 @@ def push_changes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str
             roci_cmd = f"roci {device['dns']} -hidecmd -f={jnpr_cmds_file}"
         if not dryrun:
             roci_results = roci(roci_cmd)
-            print(f"Commands have been pushed to {device['dns']}")
+            print(f"Completed pushing commands to {device['dns']}")
         else:
             roci_results = [f"DRYRUN: Command not executed on {device}"]
             print(f"DRYRUN: Commands have not been pushed to {device['dns']}")
@@ -329,24 +341,30 @@ def push_changes(device: Dict[str, str], alu_cmds_file: str, jnpr_cmds_file: str
     return output
 
 
-def send_to_devices(purpose: callable, devices: List[Dict[str, str]], alu_cmds_file: str, jnpr_cmds_file: str, dryrun: bool) -> List[str]:
+def send_to_devices(purpose: Callable, devices: List[Dict[str, str]], alu_cmds_file: str, jnpr_cmds_file: str, dryrun: bool) -> Tuple[List[str], float]:
     try:
+        start_time = time.time()
+        # with console.status(f"Scraping data from {len(devices)} devices, Please wait", spinner="arc"):
         job_list = [(device, alu_cmds_file, jnpr_cmds_file, dryrun) for device in devices]
         with multiprocessing.Pool(processes=len(job_list)) as pool:
             results = pool.starmap(purpose, job_list)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"\nCompleted processing {len(devices)} devices in {elapsed_time:.2f} seconds.\n")
         
         # Flatten the list of lists
         output = [prefix for sublist in results for prefix in sublist]
     except Exception as e:
         print(f"Error during multiprocessing: {e}")
         output = []
-    return output
+    return output, elapsed_time
 
 
 def add_to_log(log_file_path: str, log_dict: Dict[str, str], key: str, value: str) -> Dict[str, str]:
         log_dict[key] = value
         try:
             with open(log_file_path, 'a') as file:
+                os.chmod(log_file_path, 0o644)
                 if key == "Nokia Configuration" or key == "Juniper Configuration":
                     file.write(f"{key}:\n")
                     for line in value:
