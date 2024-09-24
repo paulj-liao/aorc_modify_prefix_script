@@ -25,6 +25,7 @@ https://nsmomavp045b.corp.intranet:8443/display/SOPP/AORC+Only+Modify+Prefix-lis
 
 - Python 3.10 or later
 - Required Python modules: `os`, `sys`, `datetime`, `atexit`, `time`, `fcntl`, `subprocess`, `typing`, `threading`, `multiprocessing`, `time`, `ipaddress`, `rich`
+- SSH Client settings should support `UTF-8` character encoding. For best results the Terminal should be set to `Xterm`, and a nerd font be installed.
 
 ## Installation
 
