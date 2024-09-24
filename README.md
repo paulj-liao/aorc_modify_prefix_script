@@ -1,14 +1,12 @@
-The purpose of this script is to allow the DDoS SOC
-to add and remove prefixes from existing AORC customer policies
-
-Additional documentation can be found here
-https://nsmomavp045b.corp.intranet:8443/display/SOPP/AORC+Only+Modify+Prefix-list+Script
-
 # DDoS AORC Modify Prefix-List Script
 
 ## Overview
 
 This script is designed to allow the DDoS Security Operations Center (SOC) to add and remove prefixes from existing AORC customer policies. It supports both Nokia and Juniper devices and includes features for dry-run and test modes.
+
+## Additional documentation can be found here
+
+https://nsmomavp045b.corp.intranet:8443/display/SOPP/AORC+Only+Modify+Prefix-list+Script
 
 ## Features
 
@@ -19,12 +17,14 @@ This script is designed to allow the DDoS Security Operations Center (SOC) to ad
 - **Logging**: Logs all user decisions and actions.
 - **Locking Mechanism**: Ensures only one instance of the script runs at a time.
 - **Cleanup**: Cleans up temporary files upon exit.
+- **IP Version**: Supports both IPv4 and IPv6 prefixes.
+- **Multitreading**: Leverages multithreading to speed up large scale network changes.
+- **IPaddress cleanup**: Validation checks are performed on all IP prefixes to ensure they are valid network addresses based on CIDR
 
 ## Requirements
 
-- Python 3.12 or later
-- Required Python modules: `os`, `sys`, `datetime`, `atexit`, `time`, `fcntl`, `subprocess`, `threading`
-- Custom utility functions from `utils.py`
+- Python 3.10 or later
+- Required Python modules: `os`, `sys`, `datetime`, `atexit`, `time`, `fcntl`, `subprocess`, `typing`, `threading`, `multiprocessing`, `time`, `ipaddress`, `rich`
 
 ## Installation
 
@@ -35,11 +35,8 @@ This script is designed to allow the DDoS Security Operations Center (SOC) to ad
     ```
 
 2. Ensure you have Python 3.12 or later installed.
+   The launch.sh file creates a virtual environment within Nocsup with python3.12 installed in addition to installing the Rich library.
 
-3. Install any required Python modules:
-    ```sh
-    pip install -r requirements.txt
-    ```
 
 ## Usage
 
