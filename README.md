@@ -40,16 +40,15 @@ https://nsmomavp045b.corp.intranet:8443/display/SOPP/AORC+Only+Modify+Prefix-lis
 
 ## Usage
 
-1. **Set up the script**:
-    - Modify the `script_path` variable to point to the correct directory.
-    - Ensure the `group_name` variable is set to the correct user group.
+1. **User requirements**:
+    - User must be a member of the `ddos_ops` group
 
 2. **Run the script**:
     ```sh
-    python3 main.py
+    bash launch.sh
     ```
-
-3. **Script Modes**:
+    
+4. **Script Modes**:
     - **Dry-Run Mode**: Set `dryrun = True` to generate commands without pushing them.
     - **Test Mode**: Set `test_mode = True` to run the script on test devices.
 
