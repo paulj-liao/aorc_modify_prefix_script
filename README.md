@@ -57,3 +57,9 @@ https://nsmomavp045b.corp.intranet:8443/display/SOPP/AORC+Only+Modify+Prefix-lis
 - **Log File Path**: The log file is created in the `__logs__` directory with a timestamp.
 - **Lock File Path**: The lock file is created in the `__lock__` directory.
 - **Configuration Files**: Commands for Nokia and Juniper devices are written to `__cmds_file_alu__.log` and `__cmds_file_jnpr__.log` respectively.
+
+## Logging
+Logs are stored in the __logs__ directory with a timestamp. If dryrun or test_mode is enabled, logs are prefixed with test_log__.
+
+## Cleanup
+Temporary files are cleaned up upon program exit. This includes command files for Nokia and Juniper devices.
