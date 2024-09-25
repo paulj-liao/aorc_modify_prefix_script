@@ -4,7 +4,7 @@
 
 This script is designed to allow the DDoS Security Operations Center (SOC) to add and remove prefixes from existing AORC customer policies. It supports both Nokia and Juniper devices and includes features for dry-run and test modes.
 
-## Additional documentation can be found here
+## Confluence documentation
 
 https://nsmomavp045b.corp.intranet:8443/display/SOPP/AORC+Only+Modify+Prefix-list+Script
 
