@@ -1,4 +1,5 @@
 tmp*
 test*
-__logs__/__*
+__logs__/*
 __lock__/*
+__pycache__/*
