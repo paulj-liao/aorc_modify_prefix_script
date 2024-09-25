@@ -31,8 +31,7 @@ https://nsmomavp045b.corp.intranet:8443/display/SOPP/AORC+Only+Modify+Prefix-lis
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/yourusername/ddos-aorc-modify-prefix-script.git
-    cd ddos-aorc-modify-prefix-script
+    git clone https://github.com/blackwri/ddos-aorc-modify-prefix-script.git
     ```
 
 2. Ensure you have Python 3.12 or later installed.
