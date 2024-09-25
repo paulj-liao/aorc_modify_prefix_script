@@ -4,5 +4,3 @@ __logs__/*
 __lock__/*
 __pycache*
 __pycache__/*
-**/__pycache__/
-__pycache__/ut*
