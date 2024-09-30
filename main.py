@@ -26,7 +26,7 @@ from utils import send_to_devices, select_action, get_prefixes, generate_command
 # 09/23/2024 - 0.2.2 - Added ROCI duration timer to log. Hardcoded file permissions
 
 
-dryrun = True # dry_run will ensure that the script only generates the commands but does not push them to the devices
+dryrun = False # dry_run will ensure that the script only generates the commands but does not push them to the devices
 test_mode = False # test_mode will ensure that the script only runs on the test devices
 total_time_limit = 600 # Total time limit for the script to run in seconds
 group_name = "ddosops" # Group name for the users who are allowed to run this script
