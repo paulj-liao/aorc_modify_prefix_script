@@ -10,20 +10,23 @@ from subprocess import Popen, PIPE
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 import threading
+import logging
 from utils import print_banner, rich_important_print, rich_bad_print, rich_selection_print 
 from utils import rich_success_print, is_member_of_group
-from utils import add_to_log, read_pid_lock, write_pid_lock, get_time_lapsed, get_customer_prefix_list
+from utils import read_pid_lock, write_pid_lock, get_time_lapsed, get_customer_prefix_list
 from utils import send_to_devices, select_action, get_prefixes, generate_commands, push_changes
-
 
 # Author: Richard Blackwell
 # Date: 23 September 2024 
-# Version: 0.2.2
+# Version: 0.2.3
 
 # 08/1/2024 - 0.1.0 - Initial version of the script
 # 08/31/2024 - 0.2.0 - Incorporated the Rich module for all output
 # 09/15/2024 - 0.2.1 - Added launch.sh. Restricited prefixes larger than /8 from being added
 # 09/23/2024 - 0.2.2 - Added ROCI duration timer to log. Hardcoded file permissions
+# 10/3/2024 - 0.2.3 - Adopted logging module
+
+
 
 
 dryrun = False # dry_run will ensure that the script only generates the commands but does not push them to the devices
@@ -34,8 +37,18 @@ tstamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 script_path = "/export/home/rblackwe/scripts/aorc_modify_prefix_script"
 
 # Log file path
-log_file_path = (f"{script_path}/__logs__/__log__{tstamp}.txt")
-if dryrun or test_mode: log_file_path = (f"{script_path}/__logs__/test_log__{tstamp}.txt")
+log_file_path = (f"{script_path}/__logs__/log_{tstamp}.txt")
+if dryrun or test_mode: log_file_path = (f"{script_path}/__logs__/test_log_{tstamp}.txt")
+
+# Configure logging
+logging.basicConfig(
+    filename=log_file_path,
+    level=logging.DEBUG,
+    format='%(asctime)s || %(name)s || %(levelname)s || %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
 
 # Lock file paths
 lock_file_path = (f'{script_path}/__lock__/__lock_file__')
@@ -210,9 +223,9 @@ def main() -> None:
         atexit.register(cleanup_files)
 
         # Initialize dictionary to log choices made by the user
-        user_decisions: Dict[str, str] = {}  
-        user_decisions = add_to_log(log_file_path, user_decisions, "Username", username)
-        user_decisions = add_to_log(log_file_path, user_decisions, "Timestamp", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        # Log initial information
+        logger.info(f"Username: {username}")
+        logger.info(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         # Print the banner
         print_banner(lumen_banner)
@@ -225,9 +238,9 @@ def main() -> None:
         selected_policy: str
         cust_id: str
         selected_policy, cust_id, search_time = get_customer_prefix_list(prod_devices, alu_cmds_file_path, jnpr_cmds_file_path, dryrun)
-        user_decisions = add_to_log(log_file_path, user_decisions, "Provided Cust ID", cust_id)
-        user_decisions = add_to_log(log_file_path, user_decisions, "Search time (seconds)", int(float(search_time)))
-        user_decisions = add_to_log(log_file_path, user_decisions, "Selected policy", selected_policy)
+        logger.info(f"Provided Cust ID: {cust_id}")
+        logger.info(f"Search time (seconds): {int(float(search_time))}")
+        logger.info(f"Selected policy: {selected_policy}")
         rich_selection_print(f"You have selected: {selected_policy}")
 
         # Add or remove prefixes
@@ -237,16 +250,17 @@ def main() -> None:
         action: str = select_action(menu)
         if action == "1":
             rich_selection_print("You have selected: Add prefixes")
-            user_decisions = add_to_log(log_file_path, user_decisions, "Selected action", "Add prefixes")
+            logger.info("Selected action: Add prefixes")
             add_prefixes: bool = True
             remove_prefixes: bool = False
         elif action == "2":
             rich_selection_print("You have selected: Remove prefixes")
-            user_decisions = add_to_log(log_file_path, user_decisions, "Selected action", "Remove prefixes")
+            logger.info("Selected action: Remove prefixes")
             add_prefixes: bool = False
             remove_prefixes: bool = True
         else:
             rich_bad_print(f"Invalid action selection. '{action}' was selected. Please report this error. Exiting program...")
+            logger.error(f"Invalid action selection. '{action}' was selected. Exiting program...")
             sys.exit(1)
 
         # Get the prefixes from the user
@@ -254,8 +268,8 @@ def main() -> None:
         prefix_confirm: str
         valid_prefixes, prefix_confirm = get_prefixes()
         rich_selection_print("User has confirmed the prefixes. Proceeding with generating commands...")
-        user_decisions = add_to_log(log_file_path, user_decisions, "Provided Prefixes", valid_prefixes)
-        user_decisions = add_to_log(log_file_path, user_decisions, "Prefix confirmation", prefix_confirm)
+        logger.info(f"Provided Prefixes: {valid_prefixes}")
+        logger.info(f"Prefix confirmation: {prefix_confirm}")
         
         # Generate configuration files
         cmds_alu: List[str]
@@ -263,9 +277,9 @@ def main() -> None:
         config_confirm: str
         cmds_alu, cmds_jnpr, config_confirm = generate_commands(valid_prefixes, selected_policy, add_prefixes, remove_prefixes, test_mode, dryrun)
 
-        user_decisions = add_to_log(log_file_path, user_decisions, "Nokia Configuration", cmds_alu)
-        user_decisions = add_to_log(log_file_path, user_decisions, "Juniper Configuration", cmds_jnpr)
-        user_decisions = add_to_log(log_file_path, user_decisions, "Configuration confirmation", config_confirm)
+        logger.info(f"Nokia Configuration: {cmds_alu}")
+        logger.info(f"Juniper Configuration: {cmds_jnpr}")
+        logger.info(f"Configuration confirmation: {config_confirm}")
         if not config_confirm: 
             rich_selection_print("User has chosen not confimed the configuration changes and the changes will not be pushed to producation devices. Exiting program...")
             sys.exit(0)
@@ -284,25 +298,41 @@ def main() -> None:
             file.close()
         if config_confirm: 
                 output, push_time = send_to_devices(push_changes, devices, alu_cmds_file_path, jnpr_cmds_file_path, dryrun)
-                user_decisions = add_to_log(log_file_path, user_decisions, "Config push time (seconds)", int(float(push_time)))
+                logger.info(f"Config push time (seconds): {int(float(push_time))}")
         print("")
         rich_success_print(f"\nConfiguration changes have been pushed to the devices successfully!\n")
 
         # Print the log of user's decisions
+        def print_log_file(log_file_path: str) -> None:
+            try:
+                with open(log_file_path, 'r') as log_file:
+                    for line in log_file:
+                        parts = line.strip().split(" || ")
+                        if len(parts) == 4:
+                            key_value = parts[3].split(":", 1)
+                            if len(key_value) == 2:
+                                key, value = key_value
+                                if key == "Nokia Configuration" or key == "Juniper Configuration" or key == "Provided Prefixes":
+                                    print(f"{key}:")
+                                    for line in value.split(","):
+                                        print(f"  {line}")
+                                else:
+                                    print(f"{key}: {value}")
+            except FileNotFoundError:
+                print(f"Log file not found: {log_file_path}")
+            except Exception as e:
+                print(f"Error reading log file: {e}")
+
+
         rich_selection_print(f"Decision log:")
-        for key, value in user_decisions.items():
-            if key == "Nokia Configuration" or key == "Juniper Configuration":
-                print(f"{key}:")
-                for line in value:
-                    if len(line) > 1:
-                        print(line)
-            else: 
-                print(f"{key}: {value}")
+        print_log_file(log_file_path)
 
         rich_selection_print("Program Finished. Exiting...")
+        logger.info("Program Finished. Exiting...")
         sys.exit(0)
     except KeyboardInterrupt:
         print("\nProcess interrupted by user. Exiting program...")
+        logger.info("Process interrupted by user. Exiting program...")
         sys.exit(0)
 # END OF SCRIPT
 
