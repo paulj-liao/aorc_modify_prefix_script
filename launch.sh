@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Define paths
-PYTHON_APPIMAGE="/export/home/rblackwe/python3.12.1-cp312-cp312-manylinux2014_x86_64.AppImage"
+PYTHON_APPIMAGE="/export/home/pliao/python3.12.1-cp312-cp312-manylinux2014_x86_64.AppImage"
 VENV_PATH="$HOME/.venv/venv_py312_aorc_modify_prefix"
-SOURCE_SCRIPT_DIR="/export/home/rblackwe/scripts/aorc_modify_prefix_script/main.py"
+SOURCE_SCRIPT_DIR="/export/home/pliao/scripts/aorc_modify_prefix_script/main.py"
 # If you are using the dev_main.py script, uncomment the line below and comment the line above
 # SOURCE_SCRIPT_DIR="/export/home/rblackwe/scripts/aorc_modify_prefix_script/dev_main.py"
 
