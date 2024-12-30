@@ -16,7 +16,15 @@ setup_venv() {
 
 # Function to run main.py script
 run_main_script() {
-    $VENV_PATH/bin/python3 $SOURCE_SCRIPT_DIR
+    args=""
+    if [ "$1" == "dryrun" ]; then
+        args="--dryrun"
+    elif [ "$1" == "debug" ]; then
+        args="--debug"
+    elif [ "$1" == "both" ]; then
+        args="--dryrun --debug"
+    fi
+    $VENV_PATH/bin/python3 $SOURCE_SCRIPT_DIR $args
 }
 
 # Check if virtual environment exists
@@ -25,5 +33,30 @@ if ! [ -d "$VENV_PATH" ]; then
     setup_venv
 fi
 
-run_main_script
+# Prompt user for mode
+echo "Select mode to run the script:"
+echo "1. Normal"
+echo "2. Dryrun"
+echo "3. Debug"
+echo "4. Both Dryrun and Debug"
+read -p "Enter your choice (1-4): " choice
+
+case $choice in
+    1)
+        run_main_script
+        ;;
+    2)
+        run_main_script "dryrun"
+        ;;
+    3)
+        run_main_script "debug"
+        ;;
+    4)
+        run_main_script "both"
+        ;;
+    *)
+        echo "Invalid choice. Running in normal mode."
+        run_main_script
+        ;;
+esac
 
