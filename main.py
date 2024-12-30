@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 import threading
 import logging
+import argparse
 from utils import print_banner, rich_important_print, rich_bad_print, rich_selection_print 
 from utils import rich_success_print, is_member_of_group
 from utils import read_pid_lock, write_pid_lock, get_time_lapsed, get_customer_prefix_list
@@ -25,20 +26,23 @@ from utils import send_to_devices, select_action, get_prefixes, generate_command
 # 09/15/2024 - 0.2.1 - Added launch.sh. Restricited prefixes larger than /8 from being added
 # 09/23/2024 - 0.2.2 - Added ROCI duration timer to log. Hardcoded file permissions
 # 10/3/2024 - 0.2.3 - Adopted logging module
-
-
+# 12/30/2024 - 0.2.4 - Added arg parse for dryrun and debug mode. Fixed logging issue
 
 
 dryrun = False # dry_run will ensure that the script only generates the commands but does not push them to the devices
 test_mode = False # test_mode will ensure that the script only runs on the test devices
-total_time_limit = 600 # Total time limit for the script to run in seconds
+total_time_limit = 3600 # Total time limit for the script to run in seconds
 group_name = "ddosops" # Group name for the users who are allowed to run this script
 tstamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-script_path = "/export/home/rblackwe/scripts/aorc_modify_prefix_script"
+script_path = "/export/home/pliao/scripts/aorc_modify_prefix_script"
+
+# Ensure the log directory exists
+log_dir = os.path.join(script_path, "__logs__")
+os.makedirs(log_dir, exist_ok=True)
 
 # Log file path
-log_file_path = (f"{script_path}/__logs__/log_{tstamp}.txt")
-if dryrun or test_mode: log_file_path = (f"{script_path}/__logs__/test_log_{tstamp}.txt")
+log_file_path = (f"{log_dir}/log_{tstamp}.txt")
+if dryrun or test_mode: log_file_path = (f"{log_dir}/test_log_{tstamp}.txt")
 
 # Configure logging
 logging.basicConfig(
@@ -202,6 +206,13 @@ def lock_resource():
         sys.exit(0)
 
 
+# Parse command-line arguments
+def parse_args():
+    parser = argparse.ArgumentParser(description="DDoS AORC Modify Prefix-List Script")
+    parser.add_argument('--dryrun', action='store_true', help="Run the script in dryrun mode")
+    parser.add_argument('--debug', action='store_true', help="Run the script in debug mode")
+    return parser.parse_args()
+
 
 #  BEGINNING OF SCRIPT
 def main() -> None:
@@ -338,11 +349,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    args = parse_args()
+    dryrun = args.dryrun
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+        test_mode = args.debug
     lock_resource()
-
-
-
-
-
-
-
