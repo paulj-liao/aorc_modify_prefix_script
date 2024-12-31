@@ -24,7 +24,7 @@ def rich_bad_print(text: str) -> None:
     rprint(Panel(text, style="bold red", width=panel_width))
 
 def rich_important_print(text: str) -> None:
-    rprint(Panel(text, style="bold yellow", width=panel_width))
+    rprint(Panel(text, style="bold blue", width=panel_width))
 
 def rich_selection_print(text: str) -> None:
     rprint(Panel(text, border_style="bold cyan", style = "bold", width=panel_width))
